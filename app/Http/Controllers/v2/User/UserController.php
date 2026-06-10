@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponse;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Models\WalletTransaction;
 
 class UserController extends Controller
 {
@@ -49,6 +50,35 @@ class UserController extends Controller
         'passcode' => empty($user->passcode) ? 0 : 1,
         'signature' => $this->generateQrString($name, $phone),
         'wallets' => $walletDetails,
+    ], '');
+}
+
+public function discountList(Request $request): JsonResponse
+{
+    $user = $request->user();
+
+    $discounts = WalletTransaction::query()
+        ->where('user_id', $user->id)
+        ->where('wallet_type', 'discount')
+        ->whereIn('transaction_type', [
+            'discount_earned',
+            'transfer_in',
+            'admin_add_discount',
+        ])
+        ->latest()
+        ->get()
+        ->map(function ($transaction) {
+            return [
+                'id' => $transaction->id,
+                'discount_percentage' => (float) $transaction->amount,
+                'created_at' => $transaction->created_at?->format('Y-m-d H:i:s'),
+            ];
+        })
+        ->values();
+
+    return $this->successResponse([
+        'total' => $discounts->count(),
+        'discounts' => $discounts,
     ], '');
 }
    private function generateQrString(string $name, string $phone): string

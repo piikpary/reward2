@@ -22,6 +22,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('user/profile', [UserController::class, 'show']);
     Route::post('user/save-fcm-token', [UserController::class, 'saveFcmToken']);
+    Route::get('user/discountlist', [UserController::class, 'discountList']);
 
     Route::get('user/transactions', [TransactionController::class, 'index']);
 
