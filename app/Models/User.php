@@ -29,6 +29,7 @@ class User extends Authenticatable
         'spin_balance',
         'discount_balance',
         'passcode',
+        'signature',
     ];
 
     protected $hidden = [
@@ -76,5 +77,18 @@ class User extends Authenticatable
 public function walletTransactions(): HasMany
 {
     return $this->hasMany(\App\Models\WalletTransaction::class);
+}
+
+public static function generateSignature(): string
+{
+    do {
+        $signature = '';
+
+        for ($i = 0; $i < 38; $i++) {
+            $signature .= random_int(0, 9);
+        }
+    } while (self::where('signature', $signature)->exists());
+
+    return $signature;
 }
 }

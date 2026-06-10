@@ -92,6 +92,7 @@ class AuthService
                 'status' => UserStatus::ACTIVE,
                 'name' => $phone,
                 'password' => bcrypt(str()->random(32)),
+                'signature' => User::generateSignature(),
             ]);
 
             app(\App\Services\WalletService::class)->ensureUserWallets($user);
