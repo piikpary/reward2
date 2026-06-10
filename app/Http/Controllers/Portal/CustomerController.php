@@ -79,4 +79,41 @@ class CustomerController extends Controller
             ->route('portal.customers.wallet', $user)
             ->with('success', 'Spin added successfully.');
     }
+
+    public function addDiscount(Request $request, User $user, WalletService $walletService)
+{
+    $validated = $request->validate([
+        'discount_percentage' => ['required', 'numeric', 'min:1', 'max:100'],
+        'description' => ['nullable', 'string', 'max:255'],
+    ]);
+
+    $walletService->ensureUserWallets($user);
+
+    DB::transaction(function () use ($user, $validated) {
+        $discountWallet = Wallet::where('type', 'discount')->firstOrFail();
+
+        $userDiscountWallet = UserWallet::where('user_id', $user->id)
+            ->where('wallet_id', $discountWallet->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $userDiscountWallet->balance = (float) $userDiscountWallet->balance + (float) $validated['discount_percentage'];
+        $userDiscountWallet->save();
+
+        WalletTransaction::create([
+            'user_id' => $user->id,
+            'wallet_id' => $discountWallet->id,
+            'transaction_type' => 'admin_add_discount',
+            'wallet_type' => 'discount',
+            'amount' => (float) $validated['discount_percentage'],
+            'from_user_id' => auth()->id(),
+            'to_user_id' => $user->id,
+            'description' => $validated['description'] ?? 'Discount added from portal',
+        ]);
+    });
+
+    return redirect()
+        ->route('portal.customers.wallet', $user)
+        ->with('success', 'Discount added successfully.');
+}
 }

@@ -39,6 +39,7 @@ Route::middleware('auth')->prefix('portal')->name('portal.')->group(function () 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');
     Route::post('/customers/{user}/add-spin', [CustomerController::class, 'addSpin'])->name('customers.add-spin');
+    Route::post('/customers/{user}/add-discount', [CustomerController::class, 'addDiscount'])->name('customers.add-discount');
 
 
 
