@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Slider extends Model
 {
     protected $fillable = [
         'title',
-        'image',
+        'description',
         'link',
+        'image',
         'sort_order',
         'status',
     ];
@@ -17,4 +19,8 @@ class Slider extends Model
     protected $casts = [
         'status' => 'boolean',
     ];
+    public function images(): HasMany
+    {
+        return $this->hasMany(SliderImage::class)->orderBy('sort_order');
+    }
 }

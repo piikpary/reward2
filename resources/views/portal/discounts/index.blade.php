@@ -3,12 +3,12 @@
 @section('content')
     <div class="dashboard-header">
         <div>
-            <h1 class="page-title">Sliders</h1>
-            <p class="page-subtitle">Manage mobile app slider campaigns and images.</p>
+            <h1 class="page-title">Discount Management</h1>
+            <p class="page-subtitle">Manage global discount percentages for the mobile app.</p>
         </div>
 
-        <a href="{{ route('portal.sliders.create') }}" class="quick-btn">
-            Add Slider
+        <a href="{{ route('portal.discounts.create') }}" class="quick-btn">
+            Add Discount
         </a>
     </div>
 
@@ -18,13 +18,13 @@
 
     <div class="card">
         <div class="card-body">
-            <form method="GET" action="{{ route('portal.sliders.index') }}" class="filter-form">
+            <form method="GET" action="{{ route('portal.discounts.index') }}" class="filter-form">
                 <input
                     type="text"
                     name="search"
                     class="form-control"
                     value="{{ $search }}"
-                    placeholder="Search title, description or link"
+                    placeholder="Search discount percentage"
                 >
 
                 <select name="status" class="form-control">
@@ -40,69 +40,57 @@
                 <table class="portal-table">
                     <thead>
                         <tr>
-                            <th>Preview</th>
-                            <th>Title</th>
-                            <th>Description</th>
-                            <th>Link</th>
-                            <th>Images</th>
-                            <th>Sort</th>
+                            <th>ID</th>
+                            <th>Discount</th>
                             <th>Status</th>
-                            <th width="150">Action</th>
+                            <th>Created Date</th>
+                            <th>Updated Date</th>
+                            <th width="220">Action</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        @forelse ($sliders as $slider)
+                        @forelse ($discounts as $discount)
                             <tr>
+                                <td>{{ $discount->id }}</td>
                                 <td>
-                                    @php
-                                        $firstImage = $slider->images->first()?->image ?? $slider->image ?? null;
-                                    @endphp
-
-                                    @if ($firstImage)
-                                        <img src="{{ asset('storage/' . $firstImage) }}" class="slider-thumb" alt="Slider">
-                                    @else
-                                        <div class="no-image">No Image</div>
-                                    @endif
+                                    <strong>{{ $discount->discount_percentage }}%</strong>
                                 </td>
                                 <td>
-                                    <strong>{{ $slider->title ?? '-' }}</strong>
-                                </td>
-                                <td class="text-muted">
-                                    {{ Str::limit($slider->description, 60) }}
-                                </td>
-                                <td>
-                                    @if ($slider->link)
-                                        <a href="{{ $slider->link }}" target="_blank" class="link-text">Open</a>
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td>{{ $slider->images->count() }}</td>
-                                <td>{{ $slider->sort_order }}</td>
-                                <td>
-                                    <span class="badge {{ $slider->status === 'active' ? 'badge-active' : 'badge-inactive' }}">
-                                        {{ ucfirst($slider->status) }}
+                                    <span class="badge {{ $discount->status === 'active' ? 'badge-active' : 'badge-inactive' }}">
+                                        {{ ucfirst($discount->status) }}
                                     </span>
                                 </td>
+                                <td>{{ $discount->created_at?->format('Y-m-d H:i:s') }}</td>
+                                <td>{{ $discount->updated_at?->format('Y-m-d H:i:s') }}</td>
                                 <td>
                                     <div class="action-group">
-                                        <a href="{{ route('portal.sliders.edit', $slider) }}" class="btn-small edit">
+                                        <a href="{{ route('portal.discounts.edit', $discount) }}" class="btn-small edit">
                                             Edit
                                         </a>
 
-                                        <form method="POST" action="{{ route('portal.sliders.destroy', $slider) }}"
-                                              onsubmit="return confirm('Delete this slider?')">
+                                        <form method="POST" action="{{ route('portal.discounts.toggle-status', $discount) }}">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn-small status">
+                                                {{ $discount->status === 'active' ? 'Inactive' : 'Active' }}
+                                            </button>
+                                        </form>
+
+                                        <form method="POST" action="{{ route('portal.discounts.destroy', $discount) }}"
+                                              onsubmit="return confirm('Delete this discount?')">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn-small delete">Delete</button>
+                                            <button type="submit" class="btn-small delete">
+                                                Delete
+                                            </button>
                                         </form>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="empty">No sliders found.</td>
+                                <td colspan="6" class="empty">No discounts found.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -110,7 +98,7 @@
             </div>
 
             <div style="margin-top: 18px;">
-                {{ $sliders->links() }}
+                {{ $discounts->links() }}
             </div>
         </div>
     </div>
@@ -150,36 +138,7 @@
             color: #000;
             vertical-align: middle;
             font-size: 14px;
-        }
-
-        .slider-thumb {
-            width: 82px;
-            height: 48px;
-            object-fit: cover;
-            border-radius: 10px;
-            border: 1px solid #eee;
-        }
-
-        .no-image {
-            width: 82px;
-            height: 48px;
-            border-radius: 10px;
-            background: #f3f4f6;
-            color: #6b7280;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-        }
-
-        .text-muted {
-            color: #6b7280 !important;
-        }
-
-        .link-text {
-            color: #1d4ed8;
-            text-decoration: none;
-            font-weight: 700;
+            white-space: nowrap;
         }
 
         .badge {
@@ -219,6 +178,11 @@
         .btn-small.edit {
             background: #0d1b2a;
             color: #fff;
+        }
+
+        .btn-small.status {
+            background: #eff6ff;
+            color: #1d4ed8;
         }
 
         .btn-small.delete {

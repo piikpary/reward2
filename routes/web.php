@@ -7,6 +7,7 @@ use App\Http\Controllers\Portal\ProfileController;
 use App\Http\Controllers\Portal\SliderController;
 use App\Http\Controllers\Portal\SpinRewardController;
 use App\Http\Controllers\Portal\CustomerController;
+use App\Http\Controllers\Portal\DiscountController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -35,6 +36,10 @@ Route::middleware('auth')->prefix('portal')->name('portal.')->group(function () 
 
     Route::resource('sliders', SliderController::class)
         ->except(['show']);
+
+    Route::resource('discounts', DiscountController::class)->except(['show']);
+    Route::patch('discounts/{discount}/toggle-status', [DiscountController::class, 'toggleStatus'])
+        ->name('discounts.toggle-status');
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/customers/{user}/wallet', [CustomerController::class, 'wallet'])->name('customers.wallet');

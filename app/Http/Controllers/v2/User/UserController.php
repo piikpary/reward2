@@ -8,6 +8,8 @@ use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Models\WalletTransaction;
+use App\Models\Discount;
+
 
 class UserController extends Controller
 {
@@ -55,23 +57,15 @@ class UserController extends Controller
 
 public function discountList(Request $request): JsonResponse
 {
-    $user = $request->user();
-
-    $discounts = WalletTransaction::query()
-        ->where('user_id', $user->id)
-        ->where('wallet_type', 'discount')
-        ->whereIn('transaction_type', [
-            'discount_earned',
-            'transfer_in',
-            'admin_add_discount',
-        ])
-        ->latest()
+    $discounts = Discount::query()
+        ->where('status', 'active')
+        ->orderBy('discount_percentage')
         ->get()
-        ->map(function ($transaction) {
+        ->map(function ($discount) {
             return [
-                'id' => $transaction->id,
-                'discount_percentage' => (float) $transaction->amount,
-                'created_at' => $transaction->created_at?->format('Y-m-d H:i:s'),
+                'id' => $discount->id,
+                'discount_percentage' => (int) $discount->discount_percentage,
+                'created_at' => $discount->created_at?->format('Y-m-d H:i:s'),
             ];
         })
         ->values();

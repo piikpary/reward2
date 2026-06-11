@@ -509,7 +509,12 @@
                     class="nav-link {{ request()->routeIs('portal.customers.*') ? 'active' : '' }}">
                         <span class="nav-icon">👥</span>
                         <span>Customers</span>
-                    </a>
+                </a>
+                <a href="{{ route('portal.discounts.index') }}"
+                    class="nav-link {{ request()->routeIs('portal.discounts.*') ? 'active' : '' }}">
+                        <span class="nav-icon">%</span>
+                        <span>Discounts</span>
+                </a>
             </nav>
         </aside>
     @endauth

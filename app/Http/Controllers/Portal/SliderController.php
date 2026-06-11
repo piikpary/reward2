@@ -5,15 +5,33 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Slider;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class SliderController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $sliders = Slider::latest()->paginate(10);
+        $search = $request->input('search');
+        $status = $request->input('status');
 
-        return view('portal.sliders.index', compact('sliders'));
+        $sliders = Slider::query()
+            ->with('images')
+            ->when($search, function ($query) use ($search) {
+                $query->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('link', 'like', "%{$search}%");
+            })
+            ->when($status, function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->orderBy('sort_order')
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('portal.sliders.index', compact('sliders', 'search', 'status'));
     }
 
     public function create()
@@ -24,17 +42,33 @@ class SliderController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'link' => ['nullable', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'link' => ['nullable', 'url', 'max:5000'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-            'status' => ['required', 'boolean'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+            'images' => ['required', 'array', 'min:1'],
+            'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
         ]);
 
-        $validated['image'] = $request->file('image')->store('sliders', 'public');
-        $validated['sort_order'] = $validated['sort_order'] ?? 0;
+        DB::transaction(function () use ($request, $validated) {
+            $slider = Slider::create([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'link' => $validated['link'] ?? null,
+                'sort_order' => $validated['sort_order'] ?? 0,
+                'status' => $validated['status'],
+            ]);
 
-        Slider::create($validated);
+            foreach ($request->file('images', []) as $index => $image) {
+                $path = $image->store('sliders', 'public');
+
+                $slider->images()->create([
+                    'image' => $path,
+                    'sort_order' => $index + 1,
+                ]);
+            }
+        });
 
         return redirect()
             ->route('portal.sliders.index')
@@ -43,30 +77,56 @@ class SliderController extends Controller
 
     public function edit(Slider $slider)
     {
+        $slider->load('images');
+
         return view('portal.sliders.edit', compact('slider'));
     }
 
     public function update(Request $request, Slider $slider)
     {
         $validated = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
-            'link' => ['nullable', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'link' => ['nullable', 'url', 'max:5000'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-            'status' => ['required', 'boolean'],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
+            'images' => ['nullable', 'array'],
+            'images.*' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'delete_image_ids' => ['nullable', 'array'],
+            'delete_image_ids.*' => ['integer', 'exists:slider_images,id'],
         ]);
 
-        if ($request->hasFile('image')) {
-            if ($slider->image && Storage::disk('public')->exists($slider->image)) {
-                Storage::disk('public')->delete($slider->image);
+        DB::transaction(function () use ($request, $slider, $validated) {
+            $slider->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'link' => $validated['link'] ?? null,
+                'sort_order' => $validated['sort_order'] ?? 0,
+                'status' => $validated['status'],
+            ]);
+
+            if (!empty($validated['delete_image_ids'])) {
+                $imagesToDelete = $slider->images()
+                    ->whereIn('id', $validated['delete_image_ids'])
+                    ->get();
+
+                foreach ($imagesToDelete as $image) {
+                    Storage::disk('public')->delete($image->image);
+                    $image->delete();
+                }
             }
 
-            $validated['image'] = $request->file('image')->store('sliders', 'public');
-        }
+            $currentCount = $slider->images()->count();
 
-        $validated['sort_order'] = $validated['sort_order'] ?? 0;
+            foreach ($request->file('images', []) as $index => $image) {
+                $path = $image->store('sliders', 'public');
 
-        $slider->update($validated);
+                $slider->images()->create([
+                    'image' => $path,
+                    'sort_order' => $currentCount + $index + 1,
+                ]);
+            }
+        });
 
         return redirect()
             ->route('portal.sliders.index')
@@ -75,7 +135,11 @@ class SliderController extends Controller
 
     public function destroy(Slider $slider)
     {
-        if ($slider->image && Storage::disk('public')->exists($slider->image)) {
+        foreach ($slider->images as $image) {
+            Storage::disk('public')->delete($image->image);
+        }
+
+        if (!empty($slider->image)) {
             Storage::disk('public')->delete($slider->image);
         }
 
