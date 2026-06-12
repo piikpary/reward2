@@ -373,6 +373,33 @@
             gap: 12px;
             flex-wrap: wrap;
         }
+        .pagination svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.pagination nav svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+nav[role="navigation"] svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+nav[role="navigation"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+nav[role="navigation"] a,
+nav[role="navigation"] span {
+    font-size: 14px;
+}
 
         .quick-btn {
             text-decoration: none;
