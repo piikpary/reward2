@@ -202,22 +202,45 @@ class SpinController extends Controller
                     ];
                 }
 
+                                $frontendSpins = collect($results)->map(function ($item) {
+                    return [
+                        'spin_no' => $item['request_spin_index'],
+                        'discount_percentage' => $item['discount_percentage'],
+                        'case_number' => $item['case_number'],
+                        'spin_number' => $item['spin_number'],
+                        'is_special_case' => $item['is_special_case'],
+                    ];
+                })->values();
+
                 $lastResult = collect($results)->last();
 
                 return [
-                    'campaign_id' => $lastResult['campaign_id'],
-                    'case_number' => $lastResult['case_number'],
-                    'spin_number' => $lastResult['spin_number'],
-                    'spins_per_case' => $lastResult['spins_per_case'],
+                    'qty' => $qty,
+                    'total_discount_earned' => $totalDiscountEarned,
 
-                    'discount_percentage' => $lastResult['discount_percentage'],
-                    'case_total_discount' => $lastResult['case_total_discount'],
-                    'is_special_case' => $lastResult['is_special_case'],
+                    // This list matches request qty.
+                    // Example: qty = 4, spins has 4 items.
+                    'spins' => $frontendSpins,
 
-                    'sequence' => $lastResult['sequence'],
-                    'sequence_total' => $lastResult['sequence_total'],
-                    'remaining_case_discount' => $lastResult['remaining_case_discount'],
-                    'remaining_case_spins' => $lastResult['remaining_case_spins'],
+                    // This is current case progress.
+                    // sequence belongs to the case, not request qty.
+                    'current_case' => [
+                        'campaign_id' => $lastResult['campaign_id'],
+                        'case_number' => $lastResult['case_number'],
+                        'spin_number' => $lastResult['spin_number'],
+                        'spins_per_case' => $lastResult['spins_per_case'],
+
+                        'case_total_discount' => $lastResult['case_total_discount'],
+                        'is_special_case' => $lastResult['is_special_case'],
+
+                        'sequence' => $lastResult['sequence'],
+                        'sequence_total' => $lastResult['sequence_total'],
+                        'remaining_case_discount' => $lastResult['remaining_case_discount'],
+                        'remaining_case_spins' => $lastResult['remaining_case_spins'],
+
+                        'case_completed' => $lastResult['case_completed'],
+                        'case_valid' => $lastResult['case_valid'],
+                    ],
 
                     'remaining_spins' => (float) $userSpinWallet->balance,
                     'discount_balance' => (float) $userDiscountWallet->balance,
