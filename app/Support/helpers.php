@@ -1,5 +1,7 @@
 <?php
 
+use Google\Client;
+
 if (!function_exists('generateQrString')) {
     function generateQrString(string $name, string $phone): string
     {
@@ -43,5 +45,70 @@ if (!function_exists('crc16_ccitt_false')) {
         }
 
         return $crc & 0xFFFF;
+    }
+}
+
+if (!function_exists('sendFcmNotification')) {
+    function sendFcmNotification(string $deviceToken, string $title, string $body, array $data = []): array
+    {
+        $projectId = config('services.fcm.project_id');
+        $keyFilePath = config('services.fcm.service_account_path');
+
+        if (!$projectId || !$keyFilePath) {
+            throw new Exception('FCM Project ID or Service Account Path is not configured.');
+        }
+
+        if (!file_exists($keyFilePath)) {
+            throw new Exception("Service account key file not found at: {$keyFilePath}");
+        }
+
+        $client = new Client();
+        $client->setAuthConfig($keyFilePath);
+        $client->addScope('https://www.googleapis.com/auth/firebase.messaging');
+
+        $token = $client->fetchAccessTokenWithAssertion();
+
+        if (!isset($token['access_token'])) {
+            throw new Exception('Failed to fetch access token. Response: ' . json_encode($token));
+        }
+
+        $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        $message = [
+            'message' => [
+                'token' => $deviceToken,
+                'notification' => [
+                    'title' => $title,
+                    'body' => $body,
+                ],
+                'data' => collect($data)
+                    ->map(fn ($value) => (string) $value)
+                    ->toArray(),
+            ],
+        ];
+
+        $headers = [
+            'Authorization: Bearer ' . $token['access_token'],
+            'Content-Type: application/json',
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message));
+
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $response = json_decode($result, true);
+
+        if ($httpCode !== 200) {
+            throw new Exception('FCM request failed. Status: ' . $httpCode . ' Response: ' . $result);
+        }
+
+        return $response ?? [];
     }
 }

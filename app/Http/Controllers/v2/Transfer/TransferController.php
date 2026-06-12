@@ -185,11 +185,43 @@ class TransferController extends Controller
                 ];
             });
 
+            $this->sendTransferNotification($sender, $receiver, $walletType, $amount);
+
             return $this->successResponse($result, $successMessage);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), $this->safeCode($e->getCode()));
         }
     }
+
+    private function sendTransferNotification(User $sender, User $receiver, string $walletType, float $amount): void
+{
+    if (empty($receiver->fcm_token)) {
+        return;
+    }
+
+    $title = 'Transfer Received';
+
+    $body = $walletType === 'spin'
+        ? "You have received {$amount} spin from {$sender->name}."
+        : "You have received {$amount}% discount from {$sender->name}.";
+
+    try {
+        sendFcmNotification($receiver->fcm_token, $title, $body, [
+            'type' => 'transfer',
+            'wallet_type' => $walletType,
+            'amount' => $amount,
+            'from_user_id' => $sender->id,
+            'from_phone' => $sender->phone_number,
+            'to_user_id' => $receiver->id,
+        ]);
+    } catch (\Throwable $e) {
+        \Log::error('Transfer FCM notification failed', [
+            'message' => $e->getMessage(),
+            'receiver_id' => $receiver->id,
+            'receiver_phone' => $receiver->phone_number,
+        ]);
+    }
+}
 
     private function checkPasscodeLimit(User $sender, string $passcode): ?JsonResponse
     {
