@@ -202,34 +202,28 @@ class SpinController extends Controller
                     ];
                 }
 
-                $caseGroups = collect($results)
-                    ->groupBy('case_number')
-                    ->map(function ($items, $caseNumber) {
-                        $last = $items->last();
-
-                        return [
-                            'case_number' => (int) $caseNumber,
-                            'case_total_discount' => $last['case_total_discount'],
-                            'is_special_case' => $last['is_special_case'],
-                            'sequence' => $last['sequence'],
-                            'sequence_total' => $last['sequence_total'],
-                            'remaining_case_discount' => $last['remaining_case_discount'],
-                            'remaining_case_spins' => $last['remaining_case_spins'],
-                            'case_completed' => $last['case_completed'],
-                            'case_valid' => $last['case_valid'],
-                            'spins_in_this_request' => $items->values(),
-                        ];
-                    })
-                    ->values();
+                $lastResult = collect($results)->last();
 
                 return [
-                    'qty' => $qty,
-                    'results_count' => count($results),
-                    'total_discount_earned' => $totalDiscountEarned,
+                    'campaign_id' => $lastResult['campaign_id'],
+                    'case_number' => $lastResult['case_number'],
+                    'spin_number' => $lastResult['spin_number'],
+                    'spins_per_case' => $lastResult['spins_per_case'],
+
+                    'discount_percentage' => $lastResult['discount_percentage'],
+                    'case_total_discount' => $lastResult['case_total_discount'],
+                    'is_special_case' => $lastResult['is_special_case'],
+
+                    'sequence' => $lastResult['sequence'],
+                    'sequence_total' => $lastResult['sequence_total'],
+                    'remaining_case_discount' => $lastResult['remaining_case_discount'],
+                    'remaining_case_spins' => $lastResult['remaining_case_spins'],
+
                     'remaining_spins' => (float) $userSpinWallet->balance,
                     'discount_balance' => (float) $userDiscountWallet->balance,
-                    'results' => $results,
-                    'case_groups' => $caseGroups,
+
+                    'total_spins_used' => $lastResult['total_spins_used'],
+                    'total_allowed_spins' => $lastResult['total_allowed_spins'],
                 ];
             });
 
