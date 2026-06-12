@@ -8,17 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('spin_campaigns')) {
+            return;
+        }
+
         Schema::table('spin_campaigns', function (Blueprint $table) {
             if (!Schema::hasColumn('spin_campaigns', 'total_cases')) {
                 $table->unsignedInteger('total_cases')->default(0)->after('priority');
             }
 
             if (!Schema::hasColumn('spin_campaigns', 'spins_per_case')) {
-                $table->unsignedTinyInteger('spins_per_case')->default(4)->after('total_cases');
+                $table->unsignedInteger('spins_per_case')->default(4)->after('total_cases');
             }
 
             if (!Schema::hasColumn('spin_campaigns', 'normal_discount_total')) {
-                $table->unsignedSmallInteger('normal_discount_total')->default(30)->after('spins_per_case');
+                $table->unsignedInteger('normal_discount_total')->default(30)->after('spins_per_case');
             }
 
             if (!Schema::hasColumn('spin_campaigns', 'total_spins_used')) {
@@ -29,13 +33,26 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (!Schema::hasTable('spin_campaigns')) {
+            return;
+        }
+
         Schema::table('spin_campaigns', function (Blueprint $table) {
-            $table->dropColumn([
-                'total_cases',
-                'spins_per_case',
-                'normal_discount_total',
-                'total_spins_used',
-            ]);
+            if (Schema::hasColumn('spin_campaigns', 'total_spins_used')) {
+                $table->dropColumn('total_spins_used');
+            }
+
+            if (Schema::hasColumn('spin_campaigns', 'normal_discount_total')) {
+                $table->dropColumn('normal_discount_total');
+            }
+
+            if (Schema::hasColumn('spin_campaigns', 'spins_per_case')) {
+                $table->dropColumn('spins_per_case');
+            }
+
+            if (Schema::hasColumn('spin_campaigns', 'total_cases')) {
+                $table->dropColumn('total_cases');
+            }
         });
     }
 };
