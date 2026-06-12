@@ -8,6 +8,7 @@ use App\Http\Controllers\Portal\SliderController;
 use App\Http\Controllers\Portal\SpinRewardController;
 use App\Http\Controllers\Portal\CustomerController;
 use App\Http\Controllers\Portal\DiscountController;
+use App\Http\Controllers\Portal\SpinCampaignController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -46,7 +47,10 @@ Route::middleware('auth')->prefix('portal')->name('portal.')->group(function () 
     Route::post('/customers/{user}/add-spin', [CustomerController::class, 'addSpin'])->name('customers.add-spin');
     Route::post('/customers/{user}/add-discount', [CustomerController::class, 'addDiscount'])->name('customers.add-discount');
 
-
+    Route::resource('spin-campaigns', SpinCampaignController::class);
+    Route::post('spin-campaigns/{spinCampaign}/special-cases', [SpinCampaignController::class, 'storeSpecialCase'])->name('spin-campaigns.special-cases.store');
+    Route::delete('spin-campaigns/{spinCampaign}/special-cases/{specialCase}', [SpinCampaignController::class, 'deleteSpecialCase'])->name('spin-campaigns.special-cases.delete');
+    Route::post('spin-campaigns/{spinCampaign}/reset-progress', [SpinCampaignController::class, 'resetProgress'])->name('spin-campaigns.reset-progress');
 
     Route::post('/logout', [PortalAuthController::class, 'logout'])
         ->name('logout');

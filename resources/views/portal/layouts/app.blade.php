@@ -481,41 +481,43 @@
 <div class="layout">
     @auth
         <aside class="sidebar">
-            <nav class="nav">
-                <a href="{{ route('portal.dashboard') }}"
-                   class="nav-link {{ request()->routeIs('portal.dashboard') ? 'active' : '' }}">
-                    <span class="nav-icon">▦</span>
-                    <span>Dashboard</span>
-                </a>
+           <nav class="nav">
+    <a href="{{ route('portal.dashboard') }}"
+       class="nav-link {{ request()->routeIs('portal.dashboard') ? 'active' : '' }}">
+        <span class="nav-icon">▦</span>
+        <span>Dashboard</span>
+    </a>
 
-                <a href="{{ route('portal.profile.edit') }}"
-                   class="nav-link {{ request()->routeIs('portal.profile.*') ? 'active' : '' }}">
-                    <span class="nav-icon">♙</span>
-                    <span>Profile</span>
-                </a>
-                <a href="{{ route('portal.sliders.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.sliders.*') ? 'active' : '' }}">
-                        <span class="nav-icon">▣</span>
-                        <span>Sliders</span>
-                    </a>
+    <a href="{{ route('portal.profile.edit') }}"
+       class="nav-link {{ request()->routeIs('portal.profile.*') ? 'active' : '' }}">
+        <span class="nav-icon">♙</span>
+        <span>Profile</span>
+    </a>
 
-                <a href="{{ route('portal.spin-rewards.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.spin-rewards.*') ? 'active' : '' }}">
-                        <span class="nav-icon">◉</span>
-                        <span>Spin Rewards</span>
-                    </a>
+    <a href="{{ route('portal.sliders.index') }}"
+       class="nav-link {{ request()->routeIs('portal.sliders.*') ? 'active' : '' }}">
+        <span class="nav-icon">▣</span>
+        <span>Sliders</span>
+    </a>
 
-                <a href="{{ route('portal.customers.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.customers.*') ? 'active' : '' }}">
-                        <span class="nav-icon">👥</span>
-                        <span>Customers</span>
-                </a>
-                <a href="{{ route('portal.discounts.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.discounts.*') ? 'active' : '' }}">
-                        <span class="nav-icon">%</span>
-                        <span>Discounts</span>
-                </a>
-            </nav>
+    <a href="{{ route('portal.customers.index') }}"
+       class="nav-link {{ request()->routeIs('portal.customers.*') ? 'active' : '' }}">
+        <span class="nav-icon">👥</span>
+        <span>Customers</span>
+    </a>
+
+    <a href="{{ route('portal.discounts.index') }}"
+       class="nav-link {{ request()->routeIs('portal.discounts.*') ? 'active' : '' }}">
+        <span class="nav-icon">%</span>
+        <span>Discount List</span>
+    </a>
+
+    <a href="{{ route('portal.spin-campaigns.index') }}"
+       class="nav-link {{ request()->routeIs('portal.spin-campaigns.*') ? 'active' : '' }}">
+        <span class="nav-icon">🎯</span>
+        <span>Spin Campaigns</span>
+    </a>
+</nav>
         </aside>
     @endauth
 
