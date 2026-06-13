@@ -173,33 +173,9 @@ $subCampaign = $subCampaigns->first(function ($item) use ($qty) {
         $totalAllowedSpins
         - (int) $item->total_spins_used;
 
-    if ($remainingQuota < $qty) {
-        return false;
-    }
+    return $remainingQuota >= $qty;
 
-    /*
-     * qty 1, 2, or 3:
-     * Continue the current case normally.
-     */
-    if ($qty < $spinsPerCase) {
-        return true;
-    }
-
-    /*
-     * qty exactly equals spins per case:
-     * It must begin from a new case so all results stay in one case.
-     */
-    if ($qty === $spinsPerCase) {
-        return (
-            (int) $item->total_spins_used
-            % $spinsPerCase
-        ) === 0;
-    }
-
-    /*
-     * Do not allow a request larger than one case.
-     */
-    return false;
+    
 });
 
 if (!$subCampaign) {
@@ -718,48 +694,6 @@ if (!$subCampaign) {
 |
 */
 
-if ($qty === (int) $subCampaign->spins_per_case) {
-    if (
-        count($results)
-        !== (int) $subCampaign->spins_per_case
-    ) {
-        throw new \Exception(
-            'The request did not process exactly one complete case.',
-            400
-        );
-    }
-
-    $caseNumbers = collect($results)
-        ->pluck('case_number')
-        ->unique()
-        ->values();
-
-    if ($caseNumbers->count() !== 1) {
-        throw new \Exception(
-            'All requested spins must belong to the same case.',
-            400
-        );
-    }
-
-    $completedCase = collect($results)->last();
-
-    if (!$completedCase['case_completed']) {
-        throw new \Exception(
-            'The requested spins did not complete the case.',
-            400
-        );
-    }
-
-    if (
-        (int) $completedCase['sequence_total']
-        !== (int) $completedCase['case_total_discount']
-    ) {
-        throw new \Exception(
-            'The completed case discount total does not match the configured target.',
-            400
-        );
-    }
-}
 
                 $frontendSpins = collect($results)
                     ->map(function (array $item) {
