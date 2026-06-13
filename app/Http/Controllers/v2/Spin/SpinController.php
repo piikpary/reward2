@@ -145,6 +145,10 @@ class SpinController extends Controller
 $subCampaign = $subCampaigns->first(function ($item) use ($qty) {
     $spinsPerCase = (int) $item->spins_per_case;
 
+    if ($spinsPerCase < 1) {
+        return false;
+    }
+
     $totalAllowedSpins =
         (int) $item->total_cases
         * $spinsPerCase;
@@ -153,17 +157,38 @@ $subCampaign = $subCampaigns->first(function ($item) use ($qty) {
         $totalAllowedSpins
         - (int) $item->total_spins_used;
 
-    $isAtCaseBeginning =
-        ((int) $item->total_spins_used % $spinsPerCase) === 0;
+    if ($remainingQuota < $qty) {
+        return false;
+    }
 
-    return $qty === $spinsPerCase
-        && $remainingQuota >= $qty
-        && $isAtCaseBeginning;
+    /*
+     * qty 1, 2, or 3:
+     * Continue the current case normally.
+     */
+    if ($qty < $spinsPerCase) {
+        return true;
+    }
+
+    /*
+     * qty exactly equals spins per case:
+     * It must begin from a new case so all results stay in one case.
+     */
+    if ($qty === $spinsPerCase) {
+        return (
+            (int) $item->total_spins_used
+            % $spinsPerCase
+        ) === 0;
+    }
+
+    /*
+     * Do not allow a request larger than one case.
+     */
+    return false;
 });
 
 if (!$subCampaign) {
     throw new \Exception(
-        'No active subcampaign is ready for one complete case with the requested quantity.',
+        'No active subcampaign is available for the requested quantity. For a full-case request, complete the current partial case first.',
         400
     );
 }
@@ -667,42 +692,57 @@ if (!$subCampaign) {
 |
 */
 
-if (count($results) !== (int) $subCampaign->spins_per_case) {
-    throw new \Exception(
-        'The request did not process exactly one complete case.',
-        400
-    );
-}
+/*
+|--------------------------------------------------------------------------
+| Validate only when qty requests one full case
+|--------------------------------------------------------------------------
+|
+| qty 1, 2, and 3 continue working normally.
+| qty equal to spins_per_case must complete exactly one case.
+|
+*/
 
-$caseNumbers = collect($results)
-    ->pluck('case_number')
-    ->unique()
-    ->values();
+if ($qty === (int) $subCampaign->spins_per_case) {
+    if (
+        count($results)
+        !== (int) $subCampaign->spins_per_case
+    ) {
+        throw new \Exception(
+            'The request did not process exactly one complete case.',
+            400
+        );
+    }
 
-if ($caseNumbers->count() !== 1) {
-    throw new \Exception(
-        'All requested spins must belong to the same case.',
-        400
-    );
-}
+    $caseNumbers = collect($results)
+        ->pluck('case_number')
+        ->unique()
+        ->values();
 
-$completedCase = collect($results)->last();
+    if ($caseNumbers->count() !== 1) {
+        throw new \Exception(
+            'All requested spins must belong to the same case.',
+            400
+        );
+    }
 
-if (!$completedCase['case_completed']) {
-    throw new \Exception(
-        'The requested spins did not complete the case.',
-        400
-    );
-}
+    $completedCase = collect($results)->last();
 
-if (
-    (int) $completedCase['sequence_total']
-    !== (int) $completedCase['case_total_discount']
-) {
-    throw new \Exception(
-        'The completed case discount total does not match the configured target.',
-        400
-    );
+    if (!$completedCase['case_completed']) {
+        throw new \Exception(
+            'The requested spins did not complete the case.',
+            400
+        );
+    }
+
+    if (
+        (int) $completedCase['sequence_total']
+        !== (int) $completedCase['case_total_discount']
+    ) {
+        throw new \Exception(
+            'The completed case discount total does not match the configured target.',
+            400
+        );
+    }
 }
 
                 $frontendSpins = collect($results)
