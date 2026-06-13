@@ -76,6 +76,11 @@ class SpinCampaignController extends Controller
                 'nullable',
                 'string',
             ],
+            'max_spin_qty' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
             'start_date' => [
                 'required',
                 'date',
@@ -201,6 +206,11 @@ class SpinCampaignController extends Controller
                 'nullable',
                 'string',
             ],
+            'max_spin_qty' => [
+                    'required',
+                    'integer',
+                    'min:1',
+                ],
             'start_date' => [
                 'required',
                 'date',

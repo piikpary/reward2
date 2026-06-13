@@ -47,7 +47,7 @@ class SpinController extends Controller
                 'required',
                 'integer',
                 'min:1',
-                'max:100',
+                
             ],
         ]);
 
@@ -112,6 +112,22 @@ class SpinController extends Controller
                     throw new \Exception(
                         'No active spin campaign found.',
                         404
+                    );
+                }
+
+                $maximumQty = (int) $campaign->max_spin_qty;
+
+                if ($maximumQty < 1) {
+                    throw new \Exception(
+                        'Maximum spin quantity is not configured.',
+                        400
+                    );
+                }
+
+                if ($qty > $maximumQty) {
+                    throw new \Exception(
+                        "The maximum spin quantity allowed is {$maximumQty}.",
+                        422
                     );
                 }
 

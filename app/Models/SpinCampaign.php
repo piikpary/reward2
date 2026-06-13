@@ -19,6 +19,7 @@ class SpinCampaign extends Model
         'spins_per_case',
         'normal_discount_total',
         'total_spins_used',
+        'max_spin_qty',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class SpinCampaign extends Model
         'spins_per_case' => 'integer',
         'normal_discount_total' => 'integer',
         'total_spins_used' => 'integer',
+        'max_spin_qty' => 'integer',
     ];
 
     public function specialCases(): HasMany

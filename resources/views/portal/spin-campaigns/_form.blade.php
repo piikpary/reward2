@@ -143,7 +143,7 @@
         @enderror
     </div>
 
-    <div class="form-group full">
+    <div class="form-group">
         <label for="priority">
             Priority <span class="required">*</span>
         </label>
@@ -158,11 +158,36 @@
         >
 
         <small class="help-text">
-            If main campaign periods overlap, the campaign with higher priority
+            If campaign periods overlap, the campaign with higher priority
             will be selected first.
         </small>
 
         @error('priority')
+            <small class="error">{{ $message }}</small>
+        @enderror
+    </div>
+
+    <div class="form-group">
+        <label for="max_spin_qty">
+            Maximum Spin Quantity Per Request
+            <span class="required">*</span>
+        </label>
+
+        <input
+            id="max_spin_qty"
+            type="number"
+            name="max_spin_qty"
+            value="{{ old('max_spin_qty', $campaign->max_spin_qty ?? 4) }}"
+            min="1"
+            required
+        >
+
+        <small class="help-text">
+            Maximum quantity a mobile user can request in one API call.
+            Example: set 4 to allow quantities 1, 2, 3, or 4.
+        </small>
+
+        @error('max_spin_qty')
             <small class="error">{{ $message }}</small>
         @enderror
     </div>
