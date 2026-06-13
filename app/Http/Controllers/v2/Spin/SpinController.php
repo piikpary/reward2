@@ -131,38 +131,42 @@ class SpinController extends Controller
                 */
 
                 $subCampaigns = SpinSubCampaign::query()
-                    ->where('spin_campaign_id', $campaign->id)
-                    ->where(function ($query) {
-                        $query
-                            ->where('status', 'active')
-                            ->orWhere('status', 1)
-                            ->orWhere('status', true);
-                    })
-                    ->orderByDesc('priority')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
+    ->where('spin_campaign_id', $campaign->id)
+    ->where(function ($query) {
+        $query->where('status', 'active')
+            ->orWhere('status', 1)
+            ->orWhere('status', true);
+    })
+    ->orderByDesc('priority')
+    ->orderBy('id')
+    ->lockForUpdate()
+    ->get();
 
-                $subCampaign = $subCampaigns->first(
-                    function ($item) use ($qty) {
-                        $totalAllowedSpins =
-                            (int) $item->total_cases
-                            * (int) $item->spins_per_case;
+$subCampaign = $subCampaigns->first(function ($item) use ($qty) {
+    $spinsPerCase = (int) $item->spins_per_case;
 
-                        $remainingQuota =
-                            $totalAllowedSpins
-                            - (int) $item->total_spins_used;
+    $totalAllowedSpins =
+        (int) $item->total_cases
+        * $spinsPerCase;
 
-                        return $remainingQuota >= $qty;
-                    }
-                );
+    $remainingQuota =
+        $totalAllowedSpins
+        - (int) $item->total_spins_used;
 
-                if (!$subCampaign) {
-                    throw new \Exception(
-                        'No active subcampaign has enough remaining spin quota.',
-                        400
-                    );
-                }
+    $isAtCaseBeginning =
+        ((int) $item->total_spins_used % $spinsPerCase) === 0;
+
+    return $qty === $spinsPerCase
+        && $remainingQuota >= $qty
+        && $isAtCaseBeginning;
+});
+
+if (!$subCampaign) {
+    throw new \Exception(
+        'No active subcampaign is ready for one complete case with the requested quantity.',
+        400
+    );
+}
 
                 /*
                 |--------------------------------------------------------------------------
@@ -654,6 +658,52 @@ class SpinController extends Controller
                 | so it does not need to equal qty.
                 |
                 */
+                /*
+|--------------------------------------------------------------------------
+| Validate one complete case
+|--------------------------------------------------------------------------
+|
+| One request must process exactly one whole case.
+|
+*/
+
+if (count($results) !== (int) $subCampaign->spins_per_case) {
+    throw new \Exception(
+        'The request did not process exactly one complete case.',
+        400
+    );
+}
+
+$caseNumbers = collect($results)
+    ->pluck('case_number')
+    ->unique()
+    ->values();
+
+if ($caseNumbers->count() !== 1) {
+    throw new \Exception(
+        'All requested spins must belong to the same case.',
+        400
+    );
+}
+
+$completedCase = collect($results)->last();
+
+if (!$completedCase['case_completed']) {
+    throw new \Exception(
+        'The requested spins did not complete the case.',
+        400
+    );
+}
+
+if (
+    (int) $completedCase['sequence_total']
+    !== (int) $completedCase['case_total_discount']
+) {
+    throw new \Exception(
+        'The completed case discount total does not match the configured target.',
+        400
+    );
+}
 
                 $frontendSpins = collect($results)
                     ->map(function (array $item) {

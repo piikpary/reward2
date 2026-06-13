@@ -140,7 +140,15 @@
                             @endif
                         </td>
                         <td>
-                            <form method="POST" action="{{ route('portal.spin-campaigns.special-cases.delete', [$spinCampaign, $specialCase]) }}" class="inline-form" onsubmit="return confirm('Delete this special case?')">
+                            <form
+                                    method="POST"
+                                    action="{{ route(
+                                        'portal.spin-campaigns.special-cases.destroy',
+                                        [$spinCampaign, $specialCase]
+                                    ) }}"
+                                    class="inline-form"
+                                    onsubmit="return confirm('Delete this special case?')"
+                                >
                                 @csrf
                                 @method('DELETE')
                                 <button class="btn btn-sm btn-danger">Delete</button>
