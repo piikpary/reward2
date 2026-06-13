@@ -48,4 +48,11 @@ class SpinCampaign extends Model
 
         return round(((int) $this->total_spins_used / $this->total_allowed_spins) * 100, 2);
     }
+    public function subCampaigns()
+{
+    return $this->hasMany(
+        SpinSubCampaign::class,
+        'spin_campaign_id'
+    )->orderByDesc('priority');
+}
 }

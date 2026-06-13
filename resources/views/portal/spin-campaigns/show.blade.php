@@ -4,9 +4,19 @@
 @include('portal.spin-campaigns._style')
 
 @php
-    $totalAllowed = ($spinCampaign->total_cases ?? 0) * ($spinCampaign->spins_per_case ?? 0);
+    // Controller sends this page a variable named $campaign.
+    // Keep the existing Blade code working with $spinCampaign.
+    $spinCampaign = $campaign;
+
+    $totalAllowed =
+        ($spinCampaign->total_cases ?? 0)
+        * ($spinCampaign->spins_per_case ?? 0);
+
     $used = $spinCampaign->total_spins_used ?? 0;
-    $progress = $totalAllowed > 0 ? round(($used / $totalAllowed) * 100, 2) : 0;
+
+    $progress = $totalAllowed > 0
+        ? round(($used / $totalAllowed) * 100, 2)
+        : 0;
 @endphp
 
 <div class="spin-campaign-page">

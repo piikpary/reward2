@@ -13,5 +13,14 @@ class SpinResult extends Model
         'spin_number',
         'discount_percentage',
         'case_total_discount',
+        'spin_sub_campaign_id',
+        
     ];
+    public function subCampaign()
+{
+    return $this->belongsTo(
+        SpinSubCampaign::class,
+        'spin_sub_campaign_id'
+    );
+}
 }

@@ -6,43 +6,67 @@
 <div class="spin-campaign-page">
     <div class="campaign-header">
         <div>
-            <h1>Add Spin Campaign</h1>
-            <p>Create a monthly case-based spin rule and define how discounts are distributed.</p>
+            <h1>Add Main Campaign</h1>
+
+            <p>
+                Create the main campaign period first.
+                You can add multiple subcampaign rules after saving.
+            </p>
         </div>
 
-        <a href="{{ route('portal.spin-campaigns.index') }}" class="btn btn-light">← Back</a>
+        <a
+            href="{{ route('portal.spin-campaigns.index') }}"
+            class="btn btn-light"
+        >
+            ← Back
+        </a>
     </div>
 
     <div class="campaign-guide-grid">
         <div class="guide-card">
-            <div class="guide-icon purple">🎡</div>
+            <div class="guide-icon purple">📅</div>
+
             <div>
-                <strong>4 spins / case</strong>
-                <p>Each case gets 4 spins.</p>
+                <strong>Shared campaign period</strong>
+
+                <p>
+                    All subcampaigns will operate inside this start and end date.
+                </p>
             </div>
         </div>
 
         <div class="guide-card">
-            <div class="guide-icon green">%</div>
+            <div class="guide-icon green">📂</div>
+
             <div>
-                <strong>Normal total 30%</strong>
-                <p>Example: 10% + 5% + 5% + 10% = 30%</p>
+                <strong>Multiple subcampaigns</strong>
+
+                <p>
+                    Each subcampaign can have different cases, spins, and discount totals.
+                </p>
             </div>
         </div>
 
         <div class="guide-card">
             <div class="guide-icon blue">🧾</div>
+
             <div>
                 <strong>Reward source</strong>
-                <p>Discount values come from active Discount List.</p>
+
+                <p>
+                    Spin discounts are selected from the active Discount List.
+                </p>
             </div>
         </div>
     </div>
 
     <div class="campaign-card">
-        <form method="POST" action="{{ route('portal.spin-campaigns.store') }}">
+        <form
+            method="POST"
+            action="{{ route('portal.spin-campaigns.store') }}"
+        >
             @include('portal.spin-campaigns._form', [
-                'buttonText' => 'Save Campaign'
+                'buttonText' => 'Save Main Campaign',
             ])
         </form>
     </div>

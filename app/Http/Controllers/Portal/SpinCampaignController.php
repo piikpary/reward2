@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\SpinCampaign;
 use App\Models\SpinSpecialCase;
+use App\Models\SpinSubCampaign;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,23 +13,48 @@ class SpinCampaignController extends Controller
 {
     public function index(Request $request)
     {
-        $search = $request->search;
-        $status = $request->status;
+        $search = $request->input('search');
+        $status = $request->input('status');
 
         $campaigns = SpinCampaign::query()
-            ->withCount('specialCases')
+            ->with([
+                'subCampaigns' => function ($query) {
+                    $query
+                        ->withCount('specialCases')
+                        ->orderByDesc('priority');
+                },
+            ])
+            ->withCount('subCampaigns')
             ->when($search, function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $query->where('name', 'like', "%{$search}%");
             })
-            ->when($status !== null && $status !== '', function ($query) use ($status) {
-                $query->where('status', $status);
-            })
+            ->when(
+                $status !== null && $status !== '',
+                function ($query) use ($status) {
+                    $query->where('status', (int) $status);
+                }
+            )
+            ->orderByDesc('priority')
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
-        return view('portal.spin-campaigns.index', compact('campaigns', 'search', 'status'));
+        $totalCampaigns = SpinCampaign::count();
+
+        $activeCampaigns = SpinCampaign::query()
+            ->where('status', 1)
+            ->count();
+
+        return view(
+            'portal.spin-campaigns.index',
+            compact(
+                'campaigns',
+                'search',
+                'status',
+                'totalCampaigns',
+                'activeCampaigns'
+            )
+        );
     }
 
     public function create()
@@ -41,124 +67,526 @@ class SpinCampaignController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'priority' => ['required', 'integer', 'min:0'],
-            'total_cases' => ['required', 'integer', 'min:1'],
-            'spins_per_case' => ['required', 'integer', 'min:1'],
-            'normal_discount_total' => ['required', 'integer', 'min:1'],
-            'status' => ['required'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+            'description' => [
+                'nullable',
+                'string',
+            ],
+            'start_date' => [
+                'required',
+                'date',
+            ],
+            'end_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+            ],
+            'priority' => [
+                'required',
+                'integer',
+                'min:0',
+            ],
+            'status' => [
+                'required',
+                'in:0,1',
+            ],
         ]);
 
-        $validated['rule_type'] = 'standard';
+        $validated['status'] = (int) $validated['status'];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent overlapping active campaigns
+        |--------------------------------------------------------------------------
+        |
+        | Only one active main campaign should run during the same period.
+        | Multiple subcampaigns are allowed inside that main campaign.
+        |
+        */
+
+        if (
+            $validated['status'] === 1
+            && $this->hasActiveCampaignOverlap(
+                $validated['start_date'],
+                $validated['end_date']
+            )
+        ) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'start_date' =>
+                        'Another active campaign already overlaps this period. Please deactivate the old campaign or change the dates.',
+                ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Temporary old-column defaults
+        |--------------------------------------------------------------------------
+        |
+        | These old main-campaign fields are no longer used for the actual
+        | spin rule. The actual rules are stored in spin_sub_campaigns.
+        |
+        | Keep these only while the old database columns are still required.
+        |
+        */
+
+        $validated['total_cases'] = 0;
+        $validated['spins_per_case'] = 0;
+        $validated['normal_discount_total'] = 0;
         $validated['total_spins_used'] = 0;
 
-        SpinCampaign::create($validated);
+        /*
+         * Keep "standard" if the current database enum only supports it.
+         */
+        $validated['rule_type'] = 'standard';
+
+        $campaign = SpinCampaign::create($validated);
 
         return redirect()
-            ->route('portal.spin-campaigns.index')
-            ->with('success', 'Spin campaign created successfully.');
+            ->route(
+                'portal.spin-campaigns.sub-campaigns.index',
+                $campaign
+            )
+            ->with(
+                'success',
+                'Main campaign created. Please add its subcampaign rules.'
+            );
     }
 
     public function show(SpinCampaign $spinCampaign)
     {
-        $spinCampaign->load(['specialCases' => function ($query) {
-            $query->orderBy('case_number');
-        }]);
+        $spinCampaign->load([
+            'subCampaigns' => function ($query) {
+                $query
+                    ->withCount('specialCases')
+                    ->orderByDesc('priority')
+                    ->latest();
+            },
+        ]);
 
-        return view('portal.spin-campaigns.show', compact('spinCampaign'));
+        return view('portal.spin-campaigns.show', [
+            'campaign' => $spinCampaign,
+        ]);
     }
 
     public function edit(SpinCampaign $spinCampaign)
     {
+        $spinCampaign->load([
+            'subCampaigns' => function ($query) {
+                $query->orderByDesc('priority');
+            },
+        ]);
+
         return view('portal.spin-campaigns.edit', [
             'campaign' => $spinCampaign,
         ]);
     }
 
-    public function update(Request $request, SpinCampaign $spinCampaign)
-    {
+    public function update(
+        Request $request,
+        SpinCampaign $spinCampaign
+    ) {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'priority' => ['required', 'integer', 'min:0'],
-            'total_cases' => ['required', 'integer', 'min:1'],
-            'spins_per_case' => ['required', 'integer', 'min:1'],
-            'normal_discount_total' => ['required', 'integer', 'min:1'],
-            'status' => ['required'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+            'description' => [
+                'nullable',
+                'string',
+            ],
+            'start_date' => [
+                'required',
+                'date',
+            ],
+            'end_date' => [
+                'required',
+                'date',
+                'after_or_equal:start_date',
+            ],
+            'priority' => [
+                'required',
+                'integer',
+                'min:0',
+            ],
+            'status' => [
+                'required',
+                'in:0,1',
+            ],
         ]);
 
-        $validated['rule_type'] = $spinCampaign->rule_type ?: 'standard';
+        $validated['status'] = (int) $validated['status'];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent overlapping active campaigns
+        |--------------------------------------------------------------------------
+        |
+        | Exclude the current campaign while checking.
+        |
+        */
+
+        if (
+            $validated['status'] === 1
+            && $this->hasActiveCampaignOverlap(
+                $validated['start_date'],
+                $validated['end_date'],
+                $spinCampaign->id
+            )
+        ) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'start_date' =>
+                        'Another active campaign already overlaps this period. Please deactivate the old campaign or change the dates.',
+                ]);
+        }
 
         $spinCampaign->update($validated);
 
         return redirect()
-            ->route('portal.spin-campaigns.show', $spinCampaign)
-            ->with('success', 'Spin campaign updated successfully.');
+            ->route(
+                'portal.spin-campaigns.show',
+                $spinCampaign
+            )
+            ->with(
+                'success',
+                'Main campaign updated successfully.'
+            );
     }
 
     public function destroy(SpinCampaign $spinCampaign)
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent deletion when used spins exist
+        |--------------------------------------------------------------------------
+        */
+
+        $hasUsedSpins = $spinCampaign->subCampaigns()
+            ->where('total_spins_used', '>', 0)
+            ->exists();
+
+        if ($hasUsedSpins) {
+            return back()->withErrors([
+                'delete' =>
+                    'This campaign already has spin history and cannot be deleted.',
+            ]);
+        }
+
+        $subCampaignIds = $spinCampaign
+            ->subCampaigns()
+            ->pluck('id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Also check real spin-result records
+        |--------------------------------------------------------------------------
+        */
+
+        $hasSpinResults = !$subCampaignIds->isEmpty()
+            && DB::table('spin_results')
+                ->where('spin_campaign_id', $spinCampaign->id)
+                ->whereIn(
+                    'spin_sub_campaign_id',
+                    $subCampaignIds
+                )
+                ->exists();
+
+        if ($hasSpinResults) {
+            return back()->withErrors([
+                'delete' =>
+                    'This campaign already has spin results and cannot be deleted.',
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Also check case-sequence records
+        |--------------------------------------------------------------------------
+        */
+
+        $hasCaseSequences = !$subCampaignIds->isEmpty()
+            && DB::table('spin_case_sequences')
+                ->where('spin_campaign_id', $spinCampaign->id)
+                ->whereIn(
+                    'spin_sub_campaign_id',
+                    $subCampaignIds
+                )
+                ->exists();
+
+        if ($hasCaseSequences) {
+            return back()->withErrors([
+                'delete' =>
+                    'This campaign already has case sequence history and cannot be deleted.',
+            ]);
+        }
+
         $spinCampaign->delete();
 
         return redirect()
             ->route('portal.spin-campaigns.index')
-            ->with('success', 'Spin campaign deleted successfully.');
+            ->with(
+                'success',
+                'Main campaign deleted successfully.'
+            );
     }
 
-    public function storeSpecialCase(Request $request, SpinCampaign $spinCampaign)
-    {
+    public function storeSpecialCase(
+        Request $request,
+        SpinCampaign $spinCampaign
+    ) {
         $validated = $request->validate([
-            'case_number' => ['required', 'integer', 'min:1', 'max:' . $spinCampaign->total_cases],
-            'total_discount' => ['required', 'integer', 'min:1'],
-            'status' => ['required'],
+            'spin_sub_campaign_id' => [
+                'required',
+                'integer',
+                'exists:spin_sub_campaigns,id',
+            ],
+            'case_number' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+            'total_discount' => [
+                'required',
+                'numeric',
+                'min:1',
+            ],
+            'status' => [
+                'required',
+                'in:0,1',
+            ],
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate selected subcampaign
+        |--------------------------------------------------------------------------
+        |
+        | It must belong to this main campaign.
+        |
+        */
+
+        $subCampaign = SpinSubCampaign::query()
+            ->whereKey(
+                $validated['spin_sub_campaign_id']
+            )
+            ->where(
+                'spin_campaign_id',
+                $spinCampaign->id
+            )
+            ->firstOrFail();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate special-case number
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            (int) $validated['case_number']
+            > (int) $subCampaign->total_cases
+        ) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'case_number' =>
+                        "Case number cannot exceed {$subCampaign->total_cases} cases for this subcampaign.",
+                ]);
+        }
 
         SpinSpecialCase::updateOrCreate(
             [
-                'spin_campaign_id' => $spinCampaign->id,
-                'case_number' => $validated['case_number'],
+                'spin_campaign_id' =>
+                    $spinCampaign->id,
+
+                'spin_sub_campaign_id' =>
+                    $subCampaign->id,
+
+                'case_number' =>
+                    (int) $validated['case_number'],
             ],
             [
-                'total_discount' => $validated['total_discount'],
-                'status' => $validated['status'],
+                'total_discount' =>
+                    $validated['total_discount'],
+
+                'status' =>
+                    (int) $validated['status'],
             ]
         );
 
-        return back()->with('success', 'Special case saved successfully.');
+        return back()->with(
+            'success',
+            'Special case saved successfully.'
+        );
     }
 
-    public function deleteSpecialCase(SpinCampaign $spinCampaign, SpinSpecialCase $specialCase)
-    {
-        if ((int) $specialCase->spin_campaign_id !== (int) $spinCampaign->id) {
+    public function deleteSpecialCase(
+        SpinCampaign $spinCampaign,
+        SpinSpecialCase $specialCase
+    ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Validate main campaign ownership
+        |--------------------------------------------------------------------------
+        */
+
+        $belongsToCampaign =
+            (int) $specialCase->spin_campaign_id
+            === (int) $spinCampaign->id;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Validate subcampaign ownership
+        |--------------------------------------------------------------------------
+        */
+
+        $belongsToSubCampaign =
+            $specialCase->spin_sub_campaign_id !== null
+            && $spinCampaign->subCampaigns()
+                ->whereKey(
+                    $specialCase->spin_sub_campaign_id
+                )
+                ->exists();
+
+        if (
+            !$belongsToCampaign
+            || !$belongsToSubCampaign
+        ) {
             abort(404);
         }
 
         $specialCase->delete();
 
-        return back()->with('success', 'Special case deleted successfully.');
+        return back()->with(
+            'success',
+            'Special case deleted successfully.'
+        );
     }
 
     public function resetProgress(SpinCampaign $spinCampaign)
     {
         DB::transaction(function () use ($spinCampaign) {
-            DB::table('spin_case_sequences')
-                ->where('spin_campaign_id', $spinCampaign->id)
-                ->delete();
+            $subCampaignIds = $spinCampaign
+                ->subCampaigns()
+                ->pluck('id');
 
-            DB::table('spin_results')
-                ->where('spin_campaign_id', $spinCampaign->id)
-                ->delete();
+            if (!$subCampaignIds->isEmpty()) {
+                /*
+                |--------------------------------------------------------------------------
+                | Delete case sequences
+                |--------------------------------------------------------------------------
+                */
+
+                DB::table('spin_case_sequences')
+                    ->where(
+                        'spin_campaign_id',
+                        $spinCampaign->id
+                    )
+                    ->whereIn(
+                        'spin_sub_campaign_id',
+                        $subCampaignIds
+                    )
+                    ->delete();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Delete spin results
+                |--------------------------------------------------------------------------
+                */
+
+                DB::table('spin_results')
+                    ->where(
+                        'spin_campaign_id',
+                        $spinCampaign->id
+                    )
+                    ->whereIn(
+                        'spin_sub_campaign_id',
+                        $subCampaignIds
+                    )
+                    ->delete();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Reset each subcampaign counter
+                |--------------------------------------------------------------------------
+                */
+
+                DB::table('spin_sub_campaigns')
+                    ->whereIn('id', $subCampaignIds)
+                    ->update([
+                        'total_spins_used' => 0,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Temporary parent counter reset
+            |--------------------------------------------------------------------------
+            |
+            | Keep this while total_spins_used still exists on spin_campaigns.
+            |
+            */
 
             $spinCampaign->update([
                 'total_spins_used' => 0,
             ]);
         });
 
-        return back()->with('success', 'Campaign progress reset successfully.');
+        return back()->with(
+            'success',
+            'All subcampaign progress was reset successfully.'
+        );
+    }
+
+    private function hasActiveCampaignOverlap(
+        string $startDate,
+        string $endDate,
+        ?int $ignoreCampaignId = null
+    ): bool {
+        return SpinCampaign::query()
+            ->where('status', 1)
+            ->when(
+                $ignoreCampaignId !== null,
+                function ($query) use ($ignoreCampaignId) {
+                    $query->where(
+                        'id',
+                        '!=',
+                        $ignoreCampaignId
+                    );
+                }
+            )
+            ->where(function ($query) use (
+                $startDate,
+                $endDate
+            ) {
+                /*
+                 * Two date ranges overlap when:
+                 *
+                 * existing.start_date <= new.end_date
+                 * AND
+                 * existing.end_date >= new.start_date
+                 */
+
+                $query
+                    ->where(
+                        'start_date',
+                        '<=',
+                        $endDate
+                    )
+                    ->where(
+                        'end_date',
+                        '>=',
+                        $startDate
+                    );
+            })
+            ->exists();
     }
 }

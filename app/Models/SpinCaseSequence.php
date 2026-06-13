@@ -12,9 +12,17 @@ class SpinCaseSequence extends Model
         'total_discount',
         'sequence',
         'used_spins',
+        'spin_sub_campaign_id',
     ];
 
     protected $casts = [
         'sequence' => 'array',
     ];
+    public function subCampaign()
+{
+    return $this->belongsTo(
+        SpinSubCampaign::class,
+        'spin_sub_campaign_id'
+    );
+}
 }
