@@ -743,86 +743,45 @@ class SpinController extends Controller
 }
 
     private function generateRequestSequence(
-        int $qty,
-        int $spinsPerCase,
-        int $targetDiscount,
-        array $discountList
-    ): array {
-        if ($qty < 1 || $qty > $spinsPerCase) {
-            throw new \Exception(
-                "Quantity must be between 1 and {$spinsPerCase}.",
-                422
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Full rotation
-        |--------------------------------------------------------------------------
-        |
-        | When qty equals spins_per_case, the sequence must total exactly
-        | the configured normal or special target.
-        |
-        */
-
-        if ($qty === $spinsPerCase) {
-            $sequence = $this->findExactSequence(
-                $targetDiscount,
-                $qty,
-                $discountList
-            );
-
-            if ($sequence === null) {
-                throw new \Exception(
-                    "Cannot create {$qty} spin results totaling exactly {$targetDiscount}% from the active Discount List.",
-                    400
-                );
-            }
-
-            shuffle($sequence);
-
-            return $sequence;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Partial rotation
-        |--------------------------------------------------------------------------
-        |
-        | Random values are allowed, but the total cannot exceed the
-        | configured target.
-        |
-        */
-
-                    /*
-            |--------------------------------------------------------------------------
-            | Partial rotation
-            |--------------------------------------------------------------------------
-            |
-            | Find a valid random sequence containing exactly $qty values.
-            | Its total must not exceed the configured target.
-            | Repeated discount values are allowed.
-            |
-            */
-
-            $sequence = $this->findPartialSequence(
-                $targetDiscount,
-                $qty,
-                $discountList
-            );
-
-            if ($sequence === null) {
-                throw new \Exception(
-                    "Cannot create {$qty} spin results without exceeding {$targetDiscount}% from the active Discount List.",
-                    400
-                );
-            }
-
-            shuffle($sequence);
-
-            return $sequence;
+    int $qty,
+    int $spinsPerCase,
+    int $targetDiscount,
+    array $discountList
+): array {
+    if ($qty < 1 || $qty > $spinsPerCase) {
+        throw new \Exception(
+            "Quantity must be between 1 and {$spinsPerCase}.",
+            422
+        );
     }
 
+    /*
+     * Build one valid complete sequence dynamically.
+     *
+     * $spinsPerCase and $targetDiscount come from
+     * the selected subcampaign or special case.
+     */
+    $fullSequence = $this->findExactSequence(
+        $targetDiscount,
+        $spinsPerCase,
+        $discountList
+    );
+
+    if ($fullSequence === null) {
+        throw new \Exception(
+            "Cannot create {$spinsPerCase} spin results totaling exactly {$targetDiscount}% from the active Discount List.",
+            400
+        );
+    }
+
+    shuffle($fullSequence);
+
+    return array_slice(
+        $fullSequence,
+        0,
+        $qty
+    );
+}
     /*
     |--------------------------------------------------------------------------
     | Find exact sequence
