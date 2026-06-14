@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\V2\Announcement;
+namespace App\Http\Controllers\v2\Announcement;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponse;
