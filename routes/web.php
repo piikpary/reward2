@@ -10,6 +10,7 @@ use App\Http\Controllers\Portal\CustomerController;
 use App\Http\Controllers\Portal\DiscountController;
 use App\Http\Controllers\Portal\SpinCampaignController;
 use App\Http\Controllers\Portal\SpinSubCampaignController;
+use App\Http\Controllers\Portal\AnnouncementController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -226,4 +227,22 @@ Route::middleware('auth')
             '/logout',
             [PortalAuthController::class, 'logout']
         )->name('logout');
+
+
+        Route::resource(
+            'announcements',
+            AnnouncementController::class
+        )->except(['show']);
+
+        Route::patch(
+            'announcements/{announcement}/toggle-status',
+            [AnnouncementController::class, 'toggleStatus']
+        )->name('announcements.toggle-status');
+
+        Route::delete(
+            'announcements/{announcement}/images/{image}',
+            [AnnouncementController::class, 'deleteImage']
+        )->name('announcements.images.delete');
+
+        
     });

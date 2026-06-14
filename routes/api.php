@@ -8,6 +8,7 @@ use App\Http\Controllers\v2\User\PasscodeController;
 use App\Http\Controllers\v2\Setting\SliderController;
 use App\Http\Controllers\v2\Spin\SpinController;
 use App\Http\Controllers\v2\Transfer\TransferController;
+use App\Http\Controllers\V2\Announcement\AnnouncementController;
 
 Route::prefix('auth')->group(function () {
     Route::post('request-otp', [AuthController::class, 'requestOtp'])
@@ -39,4 +40,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('transfer/receiver-check', [TransferController::class, 'checkReceiver']);
     Route::post('transfer/spin', [TransferController::class, 'transferSpin']);
     Route::post('transfer/discount', [TransferController::class, 'transferDiscount']);
+    Route::get(
+    '/announcement',
+        [AnnouncementController::class, 'index']
+    );
 });

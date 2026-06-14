@@ -31,14 +31,14 @@ class SpinController extends Controller
         | Mobile request
         |--------------------------------------------------------------------------
         |
-        | Mobile only sends:
+        | Mobile sends:
         |
         | {
         |     "qty": 1
         | }
         |
-        | Backend automatically selects the active main campaign and the
-        | highest-priority active subcampaign with enough remaining quota.
+        | The maximum qty is dynamic and comes from the selected
+        | subcampaign's spins_per_case value.
         |
         */
 
@@ -47,7 +47,6 @@ class SpinController extends Controller
                 'required',
                 'integer',
                 'min:1',
-                
             ],
         ]);
 
@@ -63,7 +62,7 @@ class SpinController extends Controller
             ) {
                 /*
                 |--------------------------------------------------------------------------
-                | Find wallets
+                | Get wallet definitions
                 |--------------------------------------------------------------------------
                 */
 
@@ -115,112 +114,136 @@ class SpinController extends Controller
                     );
                 }
 
-                $maximumQty = (int) $campaign->max_spin_qty;
-
-                if ($maximumQty < 1) {
-                    throw new \Exception(
-                        'Maximum spin quantity is not configured.',
-                        400
-                    );
-                }
-
-                if ($qty > $maximumQty) {
-                    throw new \Exception(
-                        "The maximum spin quantity allowed is {$maximumQty}.",
-                        422
-                    );
-                }
-
                 /*
                 |--------------------------------------------------------------------------
                 | Automatically select subcampaign
                 |--------------------------------------------------------------------------
                 |
-                | Selection order:
+                | Selection:
                 |
-                | 1. Active subcampaign only
+                | 1. Active subcampaign
                 | 2. Highest priority first
-                | 3. Must have enough remaining quota for the entire qty
-                |
-                | One request stays inside one subcampaign.
+                | 3. qty cannot exceed spins_per_case
+                | 4. Must have enough remaining quota
                 |
                 */
 
                 $subCampaigns = SpinSubCampaign::query()
-    ->where('spin_campaign_id', $campaign->id)
-    ->where(function ($query) {
-        $query->where('status', 'active')
-            ->orWhere('status', 1)
-            ->orWhere('status', true);
-    })
-    ->orderByDesc('priority')
-    ->orderBy('id')
-    ->lockForUpdate()
-    ->get();
+                    ->where(
+                        'spin_campaign_id',
+                        $campaign->id
+                    )
+                    ->where(function ($query) {
+                        $query
+                            ->where('status', 'active')
+                            ->orWhere('status', 1)
+                            ->orWhere('status', true);
+                    })
+                    ->orderByDesc('priority')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
 
-$subCampaign = $subCampaigns->first(function ($item) use ($qty) {
-    $spinsPerCase = (int) $item->spins_per_case;
+                $subCampaign = $subCampaigns->first(
+                    function ($item) use ($qty) {
+                        $spinsPerCase =
+                            (int) $item->spins_per_case;
 
-    if ($spinsPerCase < 1) {
-        return false;
-    }
+                        if ($spinsPerCase < 1) {
+                            return false;
+                        }
 
-    $totalAllowedSpins =
-        (int) $item->total_cases
-        * $spinsPerCase;
+                        /*
+                         * Dynamic request limit.
+                         */
+                        if ($qty > $spinsPerCase) {
+                            return false;
+                        }
 
-    $remainingQuota =
-        $totalAllowedSpins
-        - (int) $item->total_spins_used;
+                        $totalAllowedSpins =
+                            (int) $item->total_cases
+                            * $spinsPerCase;
 
-    return $remainingQuota >= $qty;
+                        $remainingQuota =
+                            $totalAllowedSpins
+                            - (int) $item->total_spins_used;
 
-    
-});
+                        return $remainingQuota >= $qty;
+                    }
+                );
 
-if (!$subCampaign) {
-    throw new \Exception(
-        'No active subcampaign is available for the requested quantity. For a full-case request, complete the current partial case first.',
-        400
-    );
-}
+                if (!$subCampaign) {
+                    throw new \Exception(
+                        'The requested quantity exceeds the active spin rule or there is not enough remaining spin quota.',
+                        400
+                    );
+                }
 
                 /*
                 |--------------------------------------------------------------------------
-                | Validate selected subcampaign rule
+                | Validate selected rule
                 |--------------------------------------------------------------------------
                 */
 
-                if ((int) $subCampaign->total_cases < 1) {
+                $totalCases =
+                    (int) $subCampaign->total_cases;
+
+                $spinsPerCase =
+                    (int) $subCampaign->spins_per_case;
+
+                $normalDiscountTotal =
+                    (int) $subCampaign->normal_discount_total;
+
+                if ($totalCases < 1) {
                     throw new \Exception(
                         'Subcampaign total cases is not configured.',
                         400
                     );
                 }
 
-                if ((int) $subCampaign->spins_per_case < 1) {
+                if ($spinsPerCase < 1) {
                     throw new \Exception(
                         'Subcampaign spins per case is not configured.',
                         400
                     );
                 }
 
-                if (
-                    (float) $subCampaign->normal_discount_total < 1
-                ) {
+                if ($normalDiscountTotal < 1) {
                     throw new \Exception(
                         'Subcampaign normal discount total is not configured.',
                         400
                     );
                 }
 
+                if ($qty > $spinsPerCase) {
+                    throw new \Exception(
+                        "Quantity cannot exceed {$spinsPerCase} spins for the selected rule.",
+                        422
+                    );
+                }
+
+                $totalAllowedSpins =
+                    $totalCases * $spinsPerCase;
+
+                $remainingQuota =
+                    $totalAllowedSpins
+                    - (int) $subCampaign->total_spins_used;
+
+                if ($remainingQuota < $qty) {
+                    throw new \Exception(
+                        'The selected subcampaign does not have enough remaining spin quota.',
+                        400
+                    );
+                }
+
                 /*
                 |--------------------------------------------------------------------------
-                | Get active discount list
+                | Get active Discount List
                 |--------------------------------------------------------------------------
                 */
 
-                $discountList = $this->getActiveDiscountList();
+                $discountList =
+                    $this->getActiveDiscountList();
 
                 if (empty($discountList)) {
                     throw new \Exception(
@@ -229,203 +252,148 @@ if (!$subCampaign) {
                     );
                 }
 
+                /*
+                |--------------------------------------------------------------------------
+                | Create a new independent rotation batch
+                |--------------------------------------------------------------------------
+                |
+                | Each API request creates a new batch.
+                | It does not continue an older partial batch.
+                |
+                */
+
+                $lastCaseNumber = SpinCaseSequence::query()
+                    ->where(
+                        'spin_campaign_id',
+                        $campaign->id
+                    )
+                    ->where(
+                        'spin_sub_campaign_id',
+                        $subCampaign->id
+                    )
+                    ->max('case_number');
+
+                $caseNumber =
+                    ((int) $lastCaseNumber) + 1;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Find special-case target
+                |--------------------------------------------------------------------------
+                */
+
+                $specialCase = SpinSpecialCase::query()
+                    ->where(
+                        'spin_campaign_id',
+                        $campaign->id
+                    )
+                    ->where(
+                        'spin_sub_campaign_id',
+                        $subCampaign->id
+                    )
+                    ->where(
+                        'case_number',
+                        $caseNumber
+                    )
+                    ->where(function ($query) {
+                        $query
+                            ->where('status', 'active')
+                            ->orWhere('status', 1)
+                            ->orWhere('status', true);
+                    })
+                    ->first();
+
+                $caseTotalDiscount = $specialCase
+                    ? (int) $specialCase->total_discount
+                    : $normalDiscountTotal;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Generate request sequence
+                |--------------------------------------------------------------------------
+                |
+                | qty == spins_per_case:
+                | exact total is required.
+                |
+                | qty < spins_per_case:
+                | random total must not exceed the configured target.
+                |
+                */
+
+                $requestSequence =
+                    $this->generateRequestSequence(
+                        $qty,
+                        $spinsPerCase,
+                        $caseTotalDiscount,
+                        $discountList
+                    );
+
+                $sequenceTotal =
+                    array_sum($requestSequence);
+
+                $isFullRotation =
+                    $qty === $spinsPerCase;
+
+                if (
+                    $isFullRotation
+                    && $sequenceTotal !== $caseTotalDiscount
+                ) {
+                    throw new \Exception(
+                        'Full rotation discount total does not match the configured target.',
+                        400
+                    );
+                }
+
+                if ($sequenceTotal > $caseTotalDiscount) {
+                    throw new \Exception(
+                        'Rotation discount total exceeds the configured target.',
+                        400
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Save request case sequence
+                |--------------------------------------------------------------------------
+                */
+
+                SpinCaseSequence::create([
+                    'spin_campaign_id' =>
+                        $campaign->id,
+
+                    'spin_sub_campaign_id' =>
+                        $subCampaign->id,
+
+                    'case_number' =>
+                        $caseNumber,
+
+                    'total_discount' =>
+                        $caseTotalDiscount,
+
+                    'sequence' =>
+                        $requestSequence,
+
+                    'used_spins' =>
+                        $qty,
+                ]);
+
                 $results = [];
                 $totalDiscountEarned = 0;
 
                 /*
                 |--------------------------------------------------------------------------
-                | Process requested spin quantity
+                | Process generated spin results
                 |--------------------------------------------------------------------------
                 */
 
-                for (
-                    $requestSpinIndex = 1;
-                    $requestSpinIndex <= $qty;
-                    $requestSpinIndex++
+                foreach (
+                    $requestSequence as $index => $discountPercentage
                 ) {
-                    $totalAllowedSpins =
-                        (int) $subCampaign->total_cases
-                        * (int) $subCampaign->spins_per_case;
-
-                    if (
-                        (int) $subCampaign->total_spins_used
-                        >= $totalAllowedSpins
-                    ) {
-                        throw new \Exception(
-                            'Subcampaign spin quota is finished.',
-                            400
-                        );
-                    }
+                    $spinNumber = $index + 1;
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Calculate case number and spin number
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $nextGlobalSpinNumber =
-                        (int) $subCampaign->total_spins_used + 1;
-
-                    $caseNumber = (int) ceil(
-                        $nextGlobalSpinNumber
-                        / (int) $subCampaign->spins_per_case
-                    );
-
-                    $spinNumberInCase =
-                        (($nextGlobalSpinNumber - 1)
-                        % (int) $subCampaign->spins_per_case)
-                        + 1;
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Find special case
-                    |--------------------------------------------------------------------------
-                    |
-                    | Special case belongs to the selected subcampaign.
-                    |
-                    */
-
-                    $specialCase = SpinSpecialCase::query()
-                        ->where(
-                            'spin_campaign_id',
-                            $campaign->id
-                        )
-                        ->where(
-                            'spin_sub_campaign_id',
-                            $subCampaign->id
-                        )
-                        ->where(
-                            'case_number',
-                            $caseNumber
-                        )
-                        ->where(function ($query) {
-                            $query
-                                ->where('status', 'active')
-                                ->orWhere('status', 1)
-                                ->orWhere('status', true);
-                        })
-                        ->first();
-
-                    $caseTotalDiscount = $specialCase
-                        ? (int) $specialCase->total_discount
-                        : (int) $subCampaign->normal_discount_total;
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Get or create case sequence
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $caseSequence = SpinCaseSequence::query()
-                        ->where(
-                            'spin_campaign_id',
-                            $campaign->id
-                        )
-                        ->where(
-                            'spin_sub_campaign_id',
-                            $subCampaign->id
-                        )
-                        ->where(
-                            'case_number',
-                            $caseNumber
-                        )
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (!$caseSequence) {
-                        $caseSequence = SpinCaseSequence::create([
-                            'spin_campaign_id' =>
-                                $campaign->id,
-
-                            'spin_sub_campaign_id' =>
-                                $subCampaign->id,
-
-                            'case_number' =>
-                                $caseNumber,
-
-                            'total_discount' =>
-                                $caseTotalDiscount,
-
-                            'sequence' =>
-                                [],
-
-                            'used_spins' =>
-                                0,
-                        ]);
-                    }
-
-                    $currentSequence = $caseSequence->sequence ?? [];
-
-                    if (is_string($currentSequence)) {
-                        $decodedSequence = json_decode(
-                            $currentSequence,
-                            true
-                        );
-
-                        $currentSequence = is_array($decodedSequence)
-                            ? $decodedSequence
-                            : [];
-                    }
-
-                    if (!is_array($currentSequence)) {
-                        $currentSequence = [];
-                    }
-
-                    /*
-                     * The saved sequence must match current case progress.
-                     */
-                    if (
-                        count($currentSequence)
-                        !== ($spinNumberInCase - 1)
-                    ) {
-                        throw new \Exception(
-                            'Spin sequence does not match current case progress.',
-                            400
-                        );
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Generate controlled random discount
-                    |--------------------------------------------------------------------------
-                    |
-                    | The result:
-                    |
-                    | - Comes from Discount List
-                    | - Can repeat
-                    | - Must allow the case to finish with the exact target
-                    |
-                    */
-
-                    $discountPercentage =
-                        $this->generateDiscountFromDiscountList(
-                            $caseTotalDiscount,
-                            (int) $subCampaign->spins_per_case,
-                            $currentSequence,
-                            $discountList
-                        );
-
-                    $currentSequence[] = $discountPercentage;
-
-                    $sequenceTotal = array_sum($currentSequence);
-
-                    $caseCompleted =
-                        count($currentSequence)
-                        === (int) $subCampaign->spins_per_case;
-
-                    if (
-                        $caseCompleted
-                        && $sequenceTotal !== $caseTotalDiscount
-                    ) {
-                        throw new \Exception(
-                            'Completed case discount total is invalid.',
-                            400
-                        );
-                    }
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Deduct one user spin
+                    | Deduct one spin
                     |--------------------------------------------------------------------------
                     */
 
@@ -442,53 +410,9 @@ if (!$subCampaign) {
 
                     $userDiscountWallet->balance =
                         (float) $userDiscountWallet->balance
-                        + $discountPercentage;
+                        + (int) $discountPercentage;
 
                     $userDiscountWallet->save();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Update subcampaign progress
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $subCampaign->total_spins_used =
-                        $nextGlobalSpinNumber;
-
-                    $subCampaign->save();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Synchronize old parent counter temporarily
-                    |--------------------------------------------------------------------------
-                    |
-                    | This is temporary while total_spins_used still exists
-                    | in the spin_campaigns table.
-                    |
-                    */
-
-                    $campaign->total_spins_used =
-                        (int) $campaign->subCampaigns()
-                            ->sum('total_spins_used');
-
-                    $campaign->save();
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Save case sequence
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $caseSequence->sequence =
-                        $currentSequence;
-
-                    $caseSequence->used_spins =
-                        $spinNumberInCase;
-
-                    $caseSequence->total_discount =
-                        $caseTotalDiscount;
-
-                    $caseSequence->save();
 
                     /*
                     |--------------------------------------------------------------------------
@@ -510,10 +434,10 @@ if (!$subCampaign) {
                             $caseNumber,
 
                         'spin_number' =>
-                            $spinNumberInCase,
+                            $spinNumber,
 
                         'discount_percentage' =>
-                            $discountPercentage,
+                            (int) $discountPercentage,
 
                         'case_total_discount' =>
                             $caseTotalDiscount,
@@ -521,7 +445,7 @@ if (!$subCampaign) {
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Record spin wallet transaction
+                    | Spin wallet transaction
                     |--------------------------------------------------------------------------
                     */
 
@@ -548,12 +472,12 @@ if (!$subCampaign) {
                             null,
 
                         'description' =>
-                            "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumberInCase}",
+                            "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
                     ]);
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Record discount wallet transaction
+                    | Discount wallet transaction
                     |--------------------------------------------------------------------------
                     */
 
@@ -571,7 +495,7 @@ if (!$subCampaign) {
                             'discount',
 
                         'amount' =>
-                            $discountPercentage,
+                            (int) $discountPercentage,
 
                         'from_user_id' =>
                             null,
@@ -580,55 +504,88 @@ if (!$subCampaign) {
                             $user->id,
 
                         'description' =>
-                            "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumberInCase}",
+                            "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
                     ]);
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Build this spin result
-                    |--------------------------------------------------------------------------
-                    */
-
-                    $remainingCaseDiscount = max(
-                        0,
-                        $caseTotalDiscount - $sequenceTotal
-                    );
-
-                    $remainingCaseSpins = max(
-                        0,
-                        (int) $subCampaign->spins_per_case
-                        - count($currentSequence)
-                    );
-
-                    $totalDiscountEarned += $discountPercentage;
+                    $totalDiscountEarned +=
+                        (int) $discountPercentage;
 
                     $results[] = [
-                        'request_spin_index' =>
-                            $requestSpinIndex,
+                        'spin_no' =>
+                            $spinNumber,
 
-                        'campaign_id' =>
-                            $campaign->id,
-
-                        'campaign_name' =>
-                            $campaign->name,
-
-                        'sub_campaign_id' =>
-                            $subCampaign->id,
-
-                        'sub_campaign_name' =>
-                            $subCampaign->name,
+                        'discount_percentage' =>
+                            (int) $discountPercentage,
 
                         'case_number' =>
                             $caseNumber,
 
                         'spin_number' =>
-                            $spinNumberInCase,
+                            $spinNumber,
+
+                        'is_special_case' =>
+                            $specialCase !== null,
+                    ];
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Update spin quota progress
+                |--------------------------------------------------------------------------
+                */
+
+                $subCampaign->total_spins_used =
+                    (int) $subCampaign->total_spins_used
+                    + $qty;
+
+                $subCampaign->save();
+
+                /*
+                 * Synchronize old parent counter temporarily.
+                 */
+                $campaign->total_spins_used =
+                    (int) $campaign->subCampaigns()
+                        ->sum('total_spins_used');
+
+                $campaign->save();
+
+                $remainingCaseDiscount = max(
+                    0,
+                    $caseTotalDiscount - $sequenceTotal
+                );
+
+                $remainingCaseSpins = max(
+                    0,
+                    $spinsPerCase - $qty
+                );
+
+                return [
+                    'qty' =>
+                        $qty,
+
+                    'total_discount_earned' =>
+                        $totalDiscountEarned,
+
+                    'selected_rule' => [
+                        'id' =>
+                            $subCampaign->id,
+
+                        'name' =>
+                            $subCampaign->name,
+                    ],
+
+                    'spins' =>
+                        $results,
+
+                    'current_case' => [
+                        'case_number' =>
+                            $caseNumber,
+
+                        'spin_number' =>
+                            $qty,
 
                         'spins_per_case' =>
-                            (int) $subCampaign->spins_per_case,
-
-                        'discount_percentage' =>
-                            $discountPercentage,
+                            $spinsPerCase,
 
                         'case_total_discount' =>
                             $caseTotalDiscount,
@@ -637,7 +594,7 @@ if (!$subCampaign) {
                             $specialCase !== null,
 
                         'sequence' =>
-                            $currentSequence,
+                            $requestSequence,
 
                         'sequence_total' =>
                             $sequenceTotal,
@@ -649,140 +606,12 @@ if (!$subCampaign) {
                             $remainingCaseSpins,
 
                         'case_completed' =>
-                            $caseCompleted,
+                            $isFullRotation,
 
                         'case_valid' =>
-                            $caseCompleted
+                            $isFullRotation
                                 ? $sequenceTotal === $caseTotalDiscount
                                 : null,
-
-                        'total_spins_used' =>
-                            $nextGlobalSpinNumber,
-
-                        'total_allowed_spins' =>
-                            $totalAllowedSpins,
-                    ];
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Prepare simple mobile response
-                |--------------------------------------------------------------------------
-                |
-                | spins count always equals qty.
-                |
-                | current_case.sequence belongs to current case progress,
-                | so it does not need to equal qty.
-                |
-                */
-                /*
-|--------------------------------------------------------------------------
-| Validate one complete case
-|--------------------------------------------------------------------------
-|
-| One request must process exactly one whole case.
-|
-*/
-
-/*
-|--------------------------------------------------------------------------
-| Validate only when qty requests one full case
-|--------------------------------------------------------------------------
-|
-| qty 1, 2, and 3 continue working normally.
-| qty equal to spins_per_case must complete exactly one case.
-|
-*/
-
-
-                $frontendSpins = collect($results)
-                    ->map(function (array $item) {
-                        return [
-                            'spin_no' =>
-                                $item['request_spin_index'],
-
-                            'discount_percentage' =>
-                                $item['discount_percentage'],
-
-                            'case_number' =>
-                                $item['case_number'],
-
-                            'spin_number' =>
-                                $item['spin_number'],
-
-                            'is_special_case' =>
-                                $item['is_special_case'],
-                        ];
-                    })
-                    ->values();
-
-                $lastResult = collect($results)->last();
-
-                return [
-                    'qty' =>
-                        $qty,
-
-                    'total_discount_earned' =>
-                        $totalDiscountEarned,
-
-                    /*
-                     * Backend automatically selected this rule.
-                     * Mobile does not need to send it.
-                     */
-                    'selected_rule' => [
-                        'id' =>
-                            $lastResult['sub_campaign_id'],
-
-                        'name' =>
-                            $lastResult['sub_campaign_name'],
-                    ],
-
-                    /*
-                     * Number of items here always equals qty.
-                     */
-                    'spins' =>
-                        $frontendSpins,
-
-                    /*
-                     * Current progress of the last case touched by this request.
-                     */
-                    'current_case' => [
-                        'case_number' =>
-                            $lastResult['case_number'],
-
-                        'spin_number' =>
-                            $lastResult['spin_number'],
-
-                        'spins_per_case' =>
-                            $lastResult['spins_per_case'],
-
-                        'case_total_discount' =>
-                            $lastResult['case_total_discount'],
-
-                        'is_special_case' =>
-                            $lastResult['is_special_case'],
-
-                        'sequence' =>
-                            $lastResult['sequence'],
-
-                        'sequence_total' =>
-                            $lastResult['sequence_total'],
-
-                        'remaining_case_discount' =>
-                            $lastResult[
-                                'remaining_case_discount'
-                            ],
-
-                        'remaining_case_spins' =>
-                            $lastResult[
-                                'remaining_case_spins'
-                            ],
-
-                        'case_completed' =>
-                            $lastResult['case_completed'],
-
-                        'case_valid' =>
-                            $lastResult['case_valid'],
                     ],
 
                     'remaining_spins' =>
@@ -792,10 +621,10 @@ if (!$subCampaign) {
                         (float) $userDiscountWallet->balance,
 
                     'total_spins_used' =>
-                        $lastResult['total_spins_used'],
+                        (int) $subCampaign->total_spins_used,
 
                     'total_allowed_spins' =>
-                        $lastResult['total_allowed_spins'],
+                        $totalAllowedSpins,
                 ];
             });
 
@@ -828,16 +657,8 @@ if (!$subCampaign) {
                     ->orWhere('status', 1)
                     ->orWhere('status', true);
             })
-            ->where(
-                'start_date',
-                '<=',
-                $now
-            )
-            ->where(
-                'end_date',
-                '>=',
-                $now
-            )
+            ->where('start_date', '<=', $now)
+            ->where('end_date', '>=', $now)
             ->orderByDesc('priority')
             ->orderBy('id')
             ->lockForUpdate()
@@ -874,151 +695,193 @@ if (!$subCampaign) {
 
     /*
     |--------------------------------------------------------------------------
-    | Generate controlled random discount
+    | Generate one request sequence
     |--------------------------------------------------------------------------
     */
+    private function findPartialSequence(
+    int $maximumTotal,
+    int $count,
+    array $discountList
+): ?array {
+    if ($count === 0) {
+        return [];
+    }
 
-    private function generateDiscountFromDiscountList(
-        int $caseTotalDiscount,
-        int $spinsPerCase,
-        array $currentSequence,
-        array $discountList
-    ): int {
-        $usedTotal = array_sum($currentSequence);
-        $usedSpins = count($currentSequence);
+    if ($maximumTotal <= 0) {
+        return null;
+    }
 
-        $remainingTotal =
-            $caseTotalDiscount - $usedTotal;
+    $values = array_values(
+        array_filter(
+            array_map('intval', $discountList),
+            fn ($value) => $value > 0
+        )
+    );
 
-        $remainingSpins =
-            $spinsPerCase - $usedSpins;
+    shuffle($values);
 
-        if ($remainingTotal <= 0) {
-            throw new \Exception(
-                'No remaining discount is available for this case.',
-                400
-            );
+    foreach ($values as $discount) {
+        if ($discount > $maximumTotal) {
+            continue;
         }
 
-        if ($remainingSpins <= 0) {
+        $remainingSequence = $this->findPartialSequence(
+            $maximumTotal - $discount,
+            $count - 1,
+            $discountList
+        );
+
+        if ($remainingSequence !== null) {
+            return array_merge(
+                [$discount],
+                $remainingSequence
+            );
+        }
+    }
+
+    return null;
+}
+
+    private function generateRequestSequence(
+        int $qty,
+        int $spinsPerCase,
+        int $targetDiscount,
+        array $discountList
+    ): array {
+        if ($qty < 1 || $qty > $spinsPerCase) {
             throw new \Exception(
-                'No remaining spins are available for this case.',
-                400
+                "Quantity must be between 1 and {$spinsPerCase}.",
+                422
             );
         }
 
         /*
-         * The last spin must exactly complete the target.
-         */
-        if ($remainingSpins === 1) {
-            if (
-                !in_array(
-                    $remainingTotal,
-                    $discountList,
-                    true
-                )
-            ) {
+        |--------------------------------------------------------------------------
+        | Full rotation
+        |--------------------------------------------------------------------------
+        |
+        | When qty equals spins_per_case, the sequence must total exactly
+        | the configured normal or special target.
+        |
+        */
+
+        if ($qty === $spinsPerCase) {
+            $sequence = $this->findExactSequence(
+                $targetDiscount,
+                $qty,
+                $discountList
+            );
+
+            if ($sequence === null) {
                 throw new \Exception(
-                    "Cannot complete case. Remaining discount {$remainingTotal}% is not available in Discount List.",
+                    "Cannot create {$qty} spin results totaling exactly {$targetDiscount}% from the active Discount List.",
                     400
                 );
             }
 
-            return $remainingTotal;
+            shuffle($sequence);
+
+            return $sequence;
         }
 
-        $validDiscounts = [];
+        /*
+        |--------------------------------------------------------------------------
+        | Partial rotation
+        |--------------------------------------------------------------------------
+        |
+        | Random values are allowed, but the total cannot exceed the
+        | configured target.
+        |
+        */
 
-        foreach ($discountList as $discount) {
-            $discount = (int) $discount;
+                    /*
+            |--------------------------------------------------------------------------
+            | Partial rotation
+            |--------------------------------------------------------------------------
+            |
+            | Find a valid random sequence containing exactly $qty values.
+            | Its total must not exceed the configured target.
+            | Repeated discount values are allowed.
+            |
+            */
 
-            if ($discount <= 0) {
-                continue;
-            }
-
-            if ($discount >= $remainingTotal) {
-                continue;
-            }
-
-            $nextRemainingTotal =
-                $remainingTotal - $discount;
-
-            $nextRemainingSpins =
-                $remainingSpins - 1;
-
-            if (
-                $this->canCompleteRemainingTotal(
-                    $nextRemainingTotal,
-                    $nextRemainingSpins,
-                    $discountList
-                )
-            ) {
-                $validDiscounts[] = $discount;
-            }
-        }
-
-        if (empty($validDiscounts)) {
-            throw new \Exception(
-                "Cannot generate a valid {$spinsPerCase}-spin sequence totaling {$caseTotalDiscount}% from the active Discount List.",
-                400
+            $sequence = $this->findPartialSequence(
+                $targetDiscount,
+                $qty,
+                $discountList
             );
-        }
 
-        return $validDiscounts[
-            array_rand($validDiscounts)
-        ];
+            if ($sequence === null) {
+                throw new \Exception(
+                    "Cannot create {$qty} spin results without exceeding {$targetDiscount}% from the active Discount List.",
+                    400
+                );
+            }
+
+            shuffle($sequence);
+
+            return $sequence;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Check if remaining target can be completed
+    | Find exact sequence
     |--------------------------------------------------------------------------
     |
-    | Repeated Discount List values are allowed.
+    | Repeated discount values are allowed.
     |
     */
 
-    private function canCompleteRemainingTotal(
-        int $targetTotal,
-        int $spinsLeft,
+    private function findExactSequence(
+        int $target,
+        int $count,
         array $discountList
-    ): bool {
-        if ($spinsLeft === 0) {
-            return $targetTotal === 0;
+    ): ?array {
+        if ($count === 0) {
+            return $target === 0
+                ? []
+                : null;
         }
 
-        if ($targetTotal <= 0) {
-            return false;
+        if ($target <= 0) {
+            return null;
         }
 
-        foreach ($discountList as $discount) {
+        $values = $discountList;
+        shuffle($values);
+
+        foreach ($values as $discount) {
             $discount = (int) $discount;
 
             if ($discount <= 0) {
                 continue;
             }
 
-            if ($discount > $targetTotal) {
+            if ($discount > $target) {
                 continue;
             }
 
-            if (
-                $this->canCompleteRemainingTotal(
-                    $targetTotal - $discount,
-                    $spinsLeft - 1,
+            $remainingSequence =
+                $this->findExactSequence(
+                    $target - $discount,
+                    $count - 1,
                     $discountList
-                )
-            ) {
-                return true;
+                );
+
+            if ($remainingSequence !== null) {
+                return array_merge(
+                    [$discount],
+                    $remainingSequence
+                );
             }
         }
 
-        return false;
+        return null;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | Safe HTTP error code
+    | Safe HTTP status code
     |--------------------------------------------------------------------------
     */
 

@@ -577,6 +577,44 @@
                 display: inline-flex;
             }
         }
+        .sidebar-link {
+    width: 100%;
+    min-height: 54px;
+    padding: 0 20px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 700;
+    box-sizing: border-box;
+    transition: 0.2s ease;
+}
+
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.sidebar-link.active {
+    background: #ffffff;
+    color: #071629;
+}
+
+.sidebar-icon {
+    width: 22px;
+    flex: 0 0 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-text {
+    flex: 1;
+}
     </style>
 
     @stack('styles')
@@ -655,6 +693,17 @@
                 >
                     <span class="nav-icon">%</span>
                     <span>Discount List</span>
+                </a>
+                <a
+                    href="{{ route('portal.announcements.index') }}"
+                    class="sidebar-link {{
+                        request()->routeIs('portal.announcements.*')
+                            ? 'active'
+                            : ''
+                    }}"
+                >
+                    <span class="sidebar-icon">📢</span>
+                    <span class="sidebar-text">Announcements</span>
                 </a>
 
                 <div class="nav-group">
