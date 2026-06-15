@@ -28,8 +28,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('user/transactions', [TransactionController::class, 'index']);
 
     Route::post('user/passcode/create', [PasscodeController::class, 'create']);
+
     Route::post('user/passcode/verify', [PasscodeController::class, 'verify']);
+
     Route::post('user/passcode/forget', [PasscodeController::class, 'forget']);
+
+    Route::post(
+        'user/passcode/verify-reset-otp',
+        [PasscodeController::class, 'verifyResetOtp']
+    );
+
     Route::post('user/passcode/reset', [PasscodeController::class, 'reset']);
 
     Route::get('slider', [SliderController::class, 'index']);
