@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\Relations\HasOne;
 class SpinSubCampaign extends Model
 {
     protected $fillable = [
@@ -69,5 +69,12 @@ class SpinSubCampaign extends Model
             0,
             $this->total_allowed_spins - $this->total_spins_used
         );
+    }
+    public function specialReward(): HasOne
+    {
+        return $this->hasOne(
+            SpinSpecialReward::class,
+            'scope_id'
+        )->where('scope_type', 'sub_campaign');
     }
 }

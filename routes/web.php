@@ -11,6 +11,7 @@ use App\Http\Controllers\Portal\DiscountController;
 use App\Http\Controllers\Portal\SpinCampaignController;
 use App\Http\Controllers\Portal\SpinSubCampaignController;
 use App\Http\Controllers\Portal\AnnouncementController;
+use App\Http\Controllers\Portal\SpecialSpinRewardController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -243,6 +244,17 @@ Route::middleware('auth')
             'announcements/{announcement}/images/{image}',
             [AnnouncementController::class, 'deleteImage']
         )->name('announcements.images.delete');
+
+
+        Route::get(
+            '/special-spin-rewards',
+            [SpecialSpinRewardController::class, 'index']
+        )->name('special-spin-rewards.index');
+
+        Route::post(
+            '/special-spin-rewards/verify',
+            [SpecialSpinRewardController::class, 'verify']
+        )->name('special-spin-rewards.verify');
 
         
     });

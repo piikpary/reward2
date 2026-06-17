@@ -214,6 +214,49 @@
         padding-left: 20px;
     }
 
+    .special-spin-box {
+        grid-column: 1 / -1;
+        padding: 20px;
+        border: 1px solid #ddd6fe;
+        border-radius: 16px;
+        background: #faf8ff;
+    }
+
+    .special-spin-heading {
+        margin: 0 0 16px;
+        color: #4c1d95;
+        font-size: 16px;
+        font-weight: 900;
+    }
+
+    .special-spin-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+    }
+
+    .checkbox-label {
+        min-height: 50px;
+        padding: 0 15px;
+        border: 1px solid #d8e0e8;
+        border-radius: 12px;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #172033;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .checkbox-label input {
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        cursor: pointer;
+    }
+
     .form-footer {
         padding: 20px 28px;
         border-top: 1px solid #edf1f5;
@@ -259,7 +302,8 @@
 
     @media (max-width: 900px) {
         .campaign-summary,
-        .form-grid {
+        .form-grid,
+        .special-spin-grid {
             grid-template-columns: 1fr;
         }
 
@@ -295,10 +339,34 @@
     }
 </style>
 
+@php
+    /*
+     * Hidden special-spin configuration for this subcampaign.
+     * The random position is not displayed in the portal.
+     */
+    $specialReward = $subCampaign->specialReward;
+
+    $specialDiscountEnabled = old(
+        'special_discount_enabled',
+        $specialReward
+            && $specialReward->status === 'active'
+    );
+
+    $specialDiscountValue = old(
+        'special_discount',
+        $specialReward?->special_discount
+    );
+
+    $specialSpinUsed =
+        $specialReward
+        && (bool) $specialReward->is_used;
+@endphp
+
 <div class="sub-page">
     <div class="sub-header">
         <div>
             <h1 class="sub-title">Edit Subcampaign</h1>
+
             <p class="sub-description">
                 Update the case and spin rule inside this main campaign period.
             </p>
@@ -320,6 +388,7 @@
 
         <div class="summary-card">
             <span>Start Date</span>
+
             <strong>
                 {{ \Carbon\Carbon::parse($campaign->start_date)->format('d M Y') }}
             </strong>
@@ -327,18 +396,19 @@
 
         <div class="summary-card">
             <span>End Date</span>
+
             <strong>
                 {{ \Carbon\Carbon::parse($campaign->end_date)->format('d M Y') }}
             </strong>
         </div>
     </div>
 
-    @if ($errors->any())
+    @if($errors->any())
         <div class="validation-box">
             <strong>Please correct the following information:</strong>
 
             <ul>
-                @foreach ($errors->all() as $error)
+                @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
@@ -358,6 +428,7 @@
 
         <div class="form-card-header">
             <h2>Subcampaign Rule</h2>
+
             <p>
                 Update total cases, spins per case, discount target, priority,
                 and status for this subcampaign.
@@ -368,7 +439,8 @@
             <div class="form-grid">
                 <div class="form-group full-width">
                     <label class="form-label" for="name">
-                        Subcampaign Name <span class="required">*</span>
+                        Subcampaign Name
+                        <span class="required">*</span>
                     </label>
 
                     <input
@@ -387,7 +459,8 @@
 
                 <div class="form-group">
                     <label class="form-label" for="total_cases">
-                        Total Cases <span class="required">*</span>
+                        Total Cases
+                        <span class="required">*</span>
                     </label>
 
                     <input
@@ -411,7 +484,8 @@
 
                 <div class="form-group">
                     <label class="form-label" for="spins_per_case">
-                        Spins Per Case <span class="required">*</span>
+                        Spins Per Case
+                        <span class="required">*</span>
                     </label>
 
                     <input
@@ -468,7 +542,8 @@
 
                 <div class="form-group">
                     <label class="form-label" for="priority">
-                        Priority <span class="required">*</span>
+                        Priority
+                        <span class="required">*</span>
                     </label>
 
                     <input
@@ -492,7 +567,8 @@
 
                 <div class="form-group">
                     <label class="form-label" for="status">
-                        Status <span class="required">*</span>
+                        Status
+                        <span class="required">*</span>
                     </label>
 
                     <select
@@ -525,6 +601,92 @@
                     @enderror
                 </div>
 
+                <div class="special-spin-box">
+                    <h3 class="special-spin-heading">
+                        Special Spin Discount
+                    </h3>
+
+                    <div class="special-spin-grid">
+                        <div class="form-group">
+                            <label
+                                for="special_discount_enabled"
+                                class="checkbox-label"
+                            >
+                                <input
+                                    id="special_discount_enabled"
+                                    type="checkbox"
+                                    name="special_discount_enabled"
+                                    value="1"
+                                    @checked($specialDiscountEnabled)
+                                    @disabled($specialSpinUsed)
+                                >
+
+                                Enable Special Spin Discount
+                            </label>
+
+                            <p class="helper-text">
+                                The system randomly assigns this reward to one
+                                hidden, unused position inside the existing
+                                subcampaign spin quota.
+                            </p>
+
+                            @error('special_discount_enabled')
+                                <span class="error-text">
+                                    {{ $message }}
+                                </span>
+                            @enderror
+                        </div>
+
+                        <div class="form-group">
+                            <label
+                                class="form-label"
+                                for="special_discount"
+                            >
+                                Special Spin Discount (%)
+
+                                @if($specialDiscountEnabled)
+                                    <span class="required">*</span>
+                                @endif
+                            </label>
+
+                            <div class="input-wrap">
+                                <input
+                                    id="special_discount"
+                                    type="number"
+                                    name="special_discount"
+                                    class="form-control"
+                                    value="{{ $specialDiscountValue }}"
+                                    min="0.01"
+                                    step="0.01"
+                                    placeholder="Example: 100"
+                                    @disabled($specialSpinUsed)
+                                >
+
+                                <span class="input-suffix">%</span>
+                            </div>
+
+                            <p class="helper-text">
+                                This replaces one normal spin result when the
+                                hidden winning position is reached. It does not
+                                increase the total number of spins.
+                            </p>
+
+                            @error('special_discount')
+                                <span class="error-text">
+                                    {{ $message }}
+                                </span>
+                            @enderror
+                        </div>
+                    </div>
+
+                    @if($specialSpinUsed)
+                        <span class="error-text">
+                            This special spin reward has already been awarded
+                            and cannot be changed.
+                        </span>
+                    @endif
+                </div>
+
                 <div class="form-group full-width">
                     <label class="form-label" for="description">
                         Description
@@ -552,7 +714,10 @@
                 Cancel
             </a>
 
-            <button type="submit" class="save-btn">
+            <button
+                type="submit"
+                class="save-btn"
+            >
                 Update Subcampaign
             </button>
         </div>

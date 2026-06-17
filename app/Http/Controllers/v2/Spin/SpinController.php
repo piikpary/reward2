@@ -17,6 +17,7 @@ use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\SpinSpecialReward;
 
 class SpinController extends Controller
 {
@@ -387,146 +388,263 @@ class SpinController extends Controller
                 */
 
                 foreach (
-                    $requestSequence as $index => $discountPercentage
-                ) {
-                    $spinNumber = $index + 1;
+    $requestSequence
+    as $index => $normalDiscountPercentage
+) {
+    $spinNumber = $index + 1;
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Deduct one spin
-                    |--------------------------------------------------------------------------
-                    */
+    /*
+    |--------------------------------------------------------------------------
+    | Existing global position inside the subcampaign
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    | total_spins_used before request = 20
+    | first result in this request     = position 21
+    | second result                    = position 22
+    |
+    | This does not add a new spin.
+    |
+    */
 
-                    $userSpinWallet->balance =
-                        (float) $userSpinWallet->balance - 1;
+    $currentSpinPosition =
+        (int) $subCampaign->total_spins_used
+        + $spinNumber;
 
-                    $userSpinWallet->save();
+    /*
+    |--------------------------------------------------------------------------
+    | Find hidden special spin reward
+    |--------------------------------------------------------------------------
+    |
+    | This works for both:
+    | - main_campaign scope
+    | - sub_campaign scope
+    |
+    | The reward service has already assigned the reward to this
+    | selected subcampaign and one hidden spin position.
+    |
+    */
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Add earned discount
-                    |--------------------------------------------------------------------------
-                    */
+    $specialReward = SpinSpecialReward::query()
+        ->where(
+            'spin_campaign_id',
+            $campaign->id
+        )
+        ->where(
+            'assigned_sub_campaign_id',
+            $subCampaign->id
+        )
+        ->where(
+            'spin_position',
+            $currentSpinPosition
+        )
+        ->where('status', 'active')
+        ->where('is_used', false)
+        ->lockForUpdate()
+        ->first();
 
-                    $userDiscountWallet->balance =
-                        (float) $userDiscountWallet->balance
-                        + (int) $discountPercentage;
+    /*
+    |--------------------------------------------------------------------------
+    | Replace only the awarded discount
+    |--------------------------------------------------------------------------
+    |
+    | The request sequence remains normal so your existing case-total
+    | validation is not changed.
+    |
+    */
 
-                    $userDiscountWallet->save();
+    $discountPercentage = $specialReward
+        ? (float) $specialReward->special_discount
+        : (float) $normalDiscountPercentage;
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Save spin result
-                    |--------------------------------------------------------------------------
-                    */
+    /*
+    |--------------------------------------------------------------------------
+    | Deduct one spin
+    |--------------------------------------------------------------------------
+    */
 
-                    SpinResult::create([
-                        'spin_campaign_id' =>
-                            $campaign->id,
+    $userSpinWallet->balance =
+        (float) $userSpinWallet->balance - 1;
 
-                        'spin_sub_campaign_id' =>
-                            $subCampaign->id,
+    $userSpinWallet->save();
 
-                        'user_id' =>
-                            $user->id,
+    /*
+    |--------------------------------------------------------------------------
+    | Add earned discount
+    |--------------------------------------------------------------------------
+    |
+    | If this is the hidden winning position, the wallet receives
+    | the special discount instead of the normal discount.
+    |
+    */
 
-                        'case_number' =>
-                            $caseNumber,
+    $userDiscountWallet->balance =
+        (float) $userDiscountWallet->balance
+        + $discountPercentage;
 
-                        'spin_number' =>
-                            $spinNumber,
+    $userDiscountWallet->save();
 
-                        'discount_percentage' =>
-                            (int) $discountPercentage,
+    /*
+    |--------------------------------------------------------------------------
+    | Save spin result
+    |--------------------------------------------------------------------------
+    */
 
-                        'case_total_discount' =>
-                            $caseTotalDiscount,
-                    ]);
+    SpinResult::create([
+        'spin_campaign_id' =>
+            $campaign->id,
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Spin wallet transaction
-                    |--------------------------------------------------------------------------
-                    */
+        'spin_sub_campaign_id' =>
+            $subCampaign->id,
 
-                    WalletTransaction::create([
-                        'user_id' =>
-                            $user->id,
+        'user_id' =>
+            $user->id,
 
-                        'wallet_id' =>
-                            $spinWallet->id,
+        'case_number' =>
+            $caseNumber,
 
-                        'transaction_type' =>
-                            'spin_used',
+        'spin_number' =>
+            $spinNumber,
 
-                        'wallet_type' =>
-                            'spin',
+        'discount_percentage' =>
+            $discountPercentage,
 
-                        'amount' =>
-                            1,
+        'case_total_discount' =>
+            $caseTotalDiscount,
+    ]);
 
-                        'from_user_id' =>
-                            $user->id,
+    /*
+    |--------------------------------------------------------------------------
+    | Mark special reward as used
+    |--------------------------------------------------------------------------
+    |
+    | This prevents another customer from receiving the same reward.
+    |
+    */
 
-                        'to_user_id' =>
-                            null,
+    if ($specialReward) {
+        $specialReward->update([
+            'is_used' => true,
+            'used_by_user_id' =>
+                $user->id,
 
-                        'description' =>
-                            "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
-                    ]);
+            'used_at' =>
+                now(),
+        ]);
+    }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Discount wallet transaction
-                    |--------------------------------------------------------------------------
-                    */
+    /*
+    |--------------------------------------------------------------------------
+    | Spin wallet transaction
+    |--------------------------------------------------------------------------
+    */
 
-                    WalletTransaction::create([
-                        'user_id' =>
-                            $user->id,
+    WalletTransaction::create([
+        'user_id' =>
+            $user->id,
 
-                        'wallet_id' =>
-                            $discountWallet->id,
+        'wallet_id' =>
+            $spinWallet->id,
 
-                        'transaction_type' =>
-                            'discount_earned',
+        'transaction_type' =>
+            'spin_used',
 
-                        'wallet_type' =>
-                            'discount',
+        'wallet_type' =>
+            'spin',
 
-                        'amount' =>
-                            (int) $discountPercentage,
+        'amount' =>
+            1,
 
-                        'from_user_id' =>
-                            null,
+        'from_user_id' =>
+            $user->id,
 
-                        'to_user_id' =>
-                            $user->id,
+        'to_user_id' =>
+            null,
 
-                        'description' =>
-                            "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
-                    ]);
+        'description' =>
+            "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}, case {$caseNumber}, spin {$spinNumber}",
+    ]);
 
-                    $totalDiscountEarned +=
-                        (int) $discountPercentage;
+    /*
+    |--------------------------------------------------------------------------
+    | Discount wallet transaction
+    |--------------------------------------------------------------------------
+    */
 
-                    $results[] = [
-                        'spin_no' =>
-                            $spinNumber,
+    WalletTransaction::create([
+        'user_id' =>
+            $user->id,
 
-                        'discount_percentage' =>
-                            (int) $discountPercentage,
+        'wallet_id' =>
+            $discountWallet->id,
 
-                        'case_number' =>
-                            $caseNumber,
+        'transaction_type' =>
+            'discount_earned',
 
-                        'spin_number' =>
-                            $spinNumber,
+        'wallet_type' =>
+            'discount',
 
-                        'is_special_case' =>
-                            $specialCase !== null,
-                    ];
-                }
+        'amount' =>
+            $discountPercentage,
+
+        'from_user_id' =>
+            null,
+
+        'to_user_id' =>
+            $user->id,
+
+        'description' =>
+            $specialReward
+                ? "Special discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}"
+                : "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
+    ]);
+
+    $totalDiscountEarned +=
+        $discountPercentage;
+
+    $results[] = [
+        'spin_no' =>
+            $spinNumber,
+
+        /*
+         * Actual discount received by the customer.
+         */
+        'discount_percentage' =>
+            $discountPercentage,
+
+        /*
+         * Original normal value before replacement.
+         */
+        'normal_discount_percentage' =>
+            (float) $normalDiscountPercentage,
+
+        'case_number' =>
+            $caseNumber,
+
+        'spin_number' =>
+            $spinNumber,
+
+        /*
+         * Existing fixed special-case concept.
+         */
+        'is_special_case' =>
+            $specialCase !== null,
+
+        /*
+         * New hidden special-spin concept.
+         */
+        'is_special_spin' =>
+            $specialReward !== null,
+
+        'special_reward_scope' =>
+            $specialReward?->scope_type,
+
+        'special_reward_code' =>
+            $specialReward
+                ? $specialReward->reward_code
+                : null,
+    ];
+}
 
                 /*
                 |--------------------------------------------------------------------------

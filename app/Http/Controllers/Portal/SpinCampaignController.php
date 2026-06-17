@@ -8,6 +8,7 @@ use App\Models\SpinSpecialCase;
 use App\Models\SpinSubCampaign;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\SpinSpecialRewardService;
 
 class SpinCampaignController extends Controller
 {
@@ -58,12 +59,14 @@ class SpinCampaignController extends Controller
     }
 
     public function create()
-    {
-        return view('portal.spin-campaigns.create', [
+{
+    return view(
+        'portal.spin-campaigns.create',
+        [
             'campaign' => new SpinCampaign(),
-        ]);
-    }
-
+        ]
+    );
+}
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -98,6 +101,17 @@ class SpinCampaignController extends Controller
             'status' => [
                 'required',
                 'in:0,1',
+            ],
+            'special_discount_enabled' => [
+                'nullable',
+                'boolean',
+            ],
+
+            'special_discount' => [
+                'nullable',
+                'required_if:special_discount_enabled,1',
+                'numeric',
+                'min:0.01',
             ],
         ]);
 
@@ -185,6 +199,7 @@ class SpinCampaignController extends Controller
             'subCampaigns' => function ($query) {
                 $query->orderByDesc('priority');
             },
+            'mainSpecialReward',
         ]);
 
         return view('portal.spin-campaigns.edit', [
@@ -192,84 +207,159 @@ class SpinCampaignController extends Controller
         ]);
     }
 
-    public function update(
-        Request $request,
-        SpinCampaign $spinCampaign
-    ) {
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'description' => [
-                'nullable',
-                'string',
-            ],
-            'max_spin_qty' => [
-                    'required',
-                    'integer',
-                    'min:1',
-                ],
-            'start_date' => [
-                'required',
-                'date',
-            ],
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-            ],
-            'priority' => [
-                'required',
-                'integer',
-                'min:0',
-            ],
-            'status' => [
-                'required',
-                'in:0,1',
-            ],
-        ]);
-
-        $validated['status'] = (int) $validated['status'];
+   public function update(
+    Request $request,
+    SpinCampaign $spinCampaign,
+    SpinSpecialRewardService $specialRewardService
+) {
+    $validated = $request->validate([
+        'name' => [
+            'required',
+            'string',
+            'max:255',
+        ],
+        'description' => [
+            'nullable',
+            'string',
+        ],
+        'max_spin_qty' => [
+            'required',
+            'integer',
+            'min:1',
+        ],
+        'start_date' => [
+            'required',
+            'date',
+        ],
+        'end_date' => [
+            'required',
+            'date',
+            'after_or_equal:start_date',
+        ],
+        'priority' => [
+            'required',
+            'integer',
+            'min:0',
+        ],
+        'status' => [
+            'required',
+            'in:0,1',
+        ],
 
         /*
         |--------------------------------------------------------------------------
-        | Prevent overlapping active campaigns
+        | Hidden special-spin configuration
         |--------------------------------------------------------------------------
-        |
-        | Exclude the current campaign while checking.
-        |
         */
 
-        if (
-            $validated['status'] === 1
-            && $this->hasActiveCampaignOverlap(
-                $validated['start_date'],
-                $validated['end_date'],
-                $spinCampaign->id
-            )
-        ) {
-            return back()
-                ->withInput()
-                ->withErrors([
-                    'start_date' =>
-                        'Another active campaign already overlaps this period. Please deactivate the old campaign or change the dates.',
-                ]);
-        }
+        'special_discount_enabled' => [
+            'nullable',
+            'boolean',
+        ],
 
-        $spinCampaign->update($validated);
+        'special_discount' => [
+            'nullable',
+            'required_if:special_discount_enabled,1',
+            'numeric',
+            'min:0.01',
+        ],
+    ]);
 
-        return redirect()
-            ->route(
-                'portal.spin-campaigns.show',
-                $spinCampaign
-            )
-            ->with(
-                'success',
-                'Main campaign updated successfully.'
-            );
+    $validated['status'] =
+        (int) $validated['status'];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent overlapping active campaigns
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $validated['status'] === 1
+        && $this->hasActiveCampaignOverlap(
+            $validated['start_date'],
+            $validated['end_date'],
+            $spinCampaign->id
+        )
+    ) {
+        return back()
+            ->withInput()
+            ->withErrors([
+                'start_date' =>
+                    'Another active campaign already overlaps this period. Please deactivate the old campaign or change the dates.',
+            ]);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Do not save special-spin fields in spin_campaigns
+    |--------------------------------------------------------------------------
+    |
+    | They belong in spin_special_rewards.
+    |
+    */
+
+    $campaignData = collect($validated)
+        ->except([
+            'special_discount_enabled',
+            'special_discount',
+        ])
+        ->toArray();
+
+    try {
+        DB::transaction(function () use (
+            $request,
+            $spinCampaign,
+            $campaignData,
+            $validated,
+            $specialRewardService
+        ) {
+            /*
+             * Keep existing main campaign update behavior.
+             */
+            $spinCampaign->update(
+                $campaignData
+            );
+
+            /*
+             * Configure only the hidden random special spin.
+             *
+             * The service:
+             * - does not increase total spins;
+             * - chooses one unused hidden spin position;
+             * - keeps an existing valid position;
+             * - stores the reward under main-campaign scope.
+             */
+            $specialRewardService
+                ->saveMainCampaignReward(
+                    $spinCampaign->fresh(),
+                    $request->boolean(
+                        'special_discount_enabled'
+                    ),
+                    isset($validated['special_discount'])
+                        ? (float) $validated['special_discount']
+                        : null
+                );
+        });
+    } catch (\RuntimeException $exception) {
+        return back()
+            ->withInput()
+            ->withErrors([
+                'special_discount' =>
+                    $exception->getMessage(),
+            ]);
+    }
+
+    return redirect()
+        ->route(
+            'portal.spin-campaigns.show',
+            $spinCampaign
+        )
+        ->with(
+            'success',
+            'Main campaign updated successfully.'
+        );
+}
 
     public function destroy(SpinCampaign $spinCampaign)
     {

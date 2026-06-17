@@ -73,7 +73,11 @@
         border: 1px solid #dfe7ef;
         border-radius: 20px;
         background:
-            radial-gradient(circle at top right, rgba(111, 45, 189, 0.10), transparent 28%),
+            radial-gradient(
+                circle at top right,
+                rgba(111, 45, 189, 0.10),
+                transparent 28%
+            ),
             linear-gradient(135deg, #ffffff, #f8fafc);
         display: flex;
         justify-content: space-between;
@@ -194,7 +198,7 @@
 
     .sub-table {
         width: 100%;
-        min-width: 1150px;
+        min-width: 1250px;
         border-collapse: collapse;
     }
 
@@ -252,7 +256,8 @@
 
     .discount-badge,
     .priority-badge,
-    .status-badge {
+    .status-badge,
+    .special-spin-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -283,6 +288,49 @@
         background: #f1f5f9;
         color: #64748b;
     }
+
+    .special-spin-active {
+        background: #ede9fe;
+        color: #6d28d9;
+    }
+
+    .special-spin-used {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .special-spin-disabled {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .special-spin-cell small {
+        display: block;
+        margin-top: 5px;
+        color: #8491a3;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .special-reward-code {
+    display: inline-block;
+    margin-top: 7px;
+    padding: 6px 9px;
+    border: 1px dashed #8b5cf6;
+    border-radius: 8px;
+    background: #f5f3ff;
+    color: #5b21b6;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+}
+
+.verification-pending {
+    color: #b45309 !important;
+}
+
+.verification-complete {
+    color: #15803d !important;
+}
 
     .progress-cell {
         min-width: 150px;
@@ -414,21 +462,34 @@
 </style>
 
 @php
-    $totalSubCampaigns = $campaign->subCampaigns()->count();
-    $activeSubCampaigns = $campaign->subCampaigns()
+    $totalSubCampaigns = $campaign
+        ->subCampaigns()
+        ->count();
+
+    $activeSubCampaigns = $campaign
+        ->subCampaigns()
         ->where('status', 'active')
         ->count();
 
-    $totalCases = $campaign->subCampaigns()->sum('total_cases');
-    $totalAllowedSpins = $campaign->subCampaigns()
+    $totalCases = $campaign
+        ->subCampaigns()
+        ->sum('total_cases');
+
+    $totalAllowedSpins = $campaign
+        ->subCampaigns()
         ->get()
-        ->sum(fn ($item) => $item->total_cases * $item->spins_per_case);
+        ->sum(function ($item) {
+            return
+                (int) $item->total_cases
+                * (int) $item->spins_per_case;
+        });
 @endphp
 
 <div class="sub-page">
     <div class="sub-header">
         <div>
             <h1 class="sub-title">Subcampaigns</h1>
+
             <p class="sub-description">
                 Manage case groups and spin rules inside the selected main campaign.
             </p>
@@ -443,7 +504,10 @@
             </a>
 
             <a
-                href="{{ route('portal.spin-campaigns.sub-campaigns.create', $campaign) }}"
+                href="{{ route(
+                    'portal.spin-campaigns.sub-campaigns.create',
+                    $campaign
+                ) }}"
                 class="add-btn"
             >
                 + Add Subcampaign
@@ -454,25 +518,32 @@
     <div class="campaign-banner">
         <div>
             <h2>{{ $campaign->name }}</h2>
+
             <p>
                 All subcampaigns below use this main campaign period.
             </p>
         </div>
 
         <div class="period-badge">
-            {{ \Carbon\Carbon::parse($campaign->start_date)->format('d M Y') }}
+            {{ \Carbon\Carbon::parse(
+                $campaign->start_date
+            )->format('d M Y') }}
+
             —
-            {{ \Carbon\Carbon::parse($campaign->end_date)->format('d M Y') }}
+
+            {{ \Carbon\Carbon::parse(
+                $campaign->end_date
+            )->format('d M Y') }}
         </div>
     </div>
 
-    @if (session('success'))
+    @if(session('success'))
         <div class="alert-box alert-success">
             {{ session('success') }}
         </div>
     @endif
 
-    @if ($errors->any())
+    @if($errors->any())
         <div class="alert-box alert-error">
             {{ $errors->first() }}
         </div>
@@ -481,22 +552,34 @@
     <div class="stats-grid">
         <div class="stat-card">
             <span>Total Subcampaigns</span>
-            <strong>{{ number_format($totalSubCampaigns) }}</strong>
+
+            <strong>
+                {{ number_format($totalSubCampaigns) }}
+            </strong>
         </div>
 
         <div class="stat-card">
             <span>Active Rules</span>
-            <strong>{{ number_format($activeSubCampaigns) }}</strong>
+
+            <strong>
+                {{ number_format($activeSubCampaigns) }}
+            </strong>
         </div>
 
         <div class="stat-card">
             <span>Combined Cases</span>
-            <strong>{{ number_format($totalCases) }}</strong>
+
+            <strong>
+                {{ number_format($totalCases) }}
+            </strong>
         </div>
 
         <div class="stat-card">
             <span>Total Spin Quota</span>
-            <strong>{{ number_format($totalAllowedSpins) }}</strong>
+
+            <strong>
+                {{ number_format($totalAllowedSpins) }}
+            </strong>
         </div>
     </div>
 
@@ -504,8 +587,10 @@
         <div class="table-card-header">
             <div>
                 <h3>Subcampaign Rules</h3>
+
                 <p>
-                    Each rule can have different cases, spins per case, and discount totals.
+                    Each rule can have different cases, spins per case,
+                    discount totals, and an optional hidden special spin.
                 </p>
             </div>
         </div>
@@ -518,6 +603,7 @@
                         <th>Cases</th>
                         <th>Spin Rule</th>
                         <th>Normal Total</th>
+                        <th>Special Spin</th>
                         <th>Spin Quota</th>
                         <th>Usage Progress</th>
                         <th>Remaining</th>
@@ -531,46 +617,139 @@
                     @forelse($subCampaigns as $subCampaign)
                         @php
                             $totalSpins =
-                                $subCampaign->total_cases
-                                * $subCampaign->spins_per_case;
+                                (int) $subCampaign->total_cases
+                                * (int) $subCampaign->spins_per_case;
 
-                            $usedSpins = (int) $subCampaign->total_spins_used;
-                            $remainingSpins = max(0, $totalSpins - $usedSpins);
+                            $usedSpins =
+                                (int) $subCampaign->total_spins_used;
+
+                            $remainingSpins = max(
+                                0,
+                                $totalSpins - $usedSpins
+                            );
 
                             $progress = $totalSpins > 0
-                                ? min(100, ($usedSpins / $totalSpins) * 100)
+                                ? min(
+                                    100,
+                                    ($usedSpins / $totalSpins) * 100
+                                )
                                 : 0;
+
+                            /*
+                             * Hidden special-spin configuration.
+                             *
+                             * Do not display the assigned position.
+                             */
+                            $specialReward =
+                                $subCampaign->specialReward;
+
+                            $hasActiveSpecialSpin =
+                                $specialReward
+                                && $specialReward->status === 'active';
+
+                            $specialSpinUsed =
+                                $specialReward
+                                && (bool) $specialReward->is_used;
                         @endphp
 
                         <tr>
                             <td>
                                 <div class="rule-name">
-                                    <strong>{{ $subCampaign->name }}</strong>
+                                    <strong>
+                                        {{ $subCampaign->name }}
+                                    </strong>
 
                                     <small>
-                                        {{ $subCampaign->description ?: 'No description' }}
+                                        {{
+                                            $subCampaign->description
+                                                ?: 'No description'
+                                        }}
                                     </small>
                                 </div>
                             </td>
 
                             <td>
                                 <span class="number-value">
-                                    {{ number_format($subCampaign->total_cases) }}
+                                    {{
+                                        number_format(
+                                            $subCampaign->total_cases
+                                        )
+                                    }}
                                 </span>
                             </td>
 
                             <td>
                                 <span class="number-value">
-                                    {{ $subCampaign->spins_per_case }} spins / case
+                                    {{ $subCampaign->spins_per_case }}
+                                    spins / case
                                 </span>
                             </td>
 
                             <td>
                                 <span class="discount-badge">
-                                    {{ number_format($subCampaign->normal_discount_total, 2) }}%
+                                    {{
+                                        number_format(
+                                            $subCampaign
+                                                ->normal_discount_total,
+                                            2
+                                        )
+                                    }}%
                                 </span>
                             </td>
 
+                           <td>
+    <div class="special-spin-cell">
+        @if($hasActiveSpecialSpin)
+            <span
+                class="special-spin-badge {{
+                    $specialSpinUsed
+                        ? 'special-spin-used'
+                        : 'special-spin-active'
+                }}"
+            >
+                {{
+                    number_format(
+                        (float) $specialReward->special_discount,
+                        2
+                    )
+                }}%
+            </span>
+
+            <small>
+                {{
+                    $specialSpinUsed
+                        ? 'Winner found'
+                        : 'Waiting for winner'
+                }}
+            </small>
+
+            <small>
+                Code:
+                {{ $specialReward->reward_code ?? '-' }}
+            </small>
+
+            <small>
+                <a
+                    href="{{ route(
+                        'portal.special-spin-rewards.index',
+                        [
+                            'search' =>
+                                $specialReward->reward_code,
+                        ]
+                    ) }}"
+                >
+                    View record
+                </a>
+            </small>
+        @else
+            <span
+                class="special-spin-badge special-spin-disabled"
+            >
+                Disabled
+            </span>
+        @endif
+    </div>
+</td>
                             <td>
                                 <span class="number-value">
                                     {{ number_format($totalSpins) }}
@@ -587,7 +766,12 @@
                                         </span>
 
                                         <span>
-                                            {{ number_format($progress, 1) }}%
+                                            {{
+                                                number_format(
+                                                    $progress,
+                                                    1
+                                                )
+                                            }}%
                                         </span>
                                     </div>
 
@@ -602,7 +786,11 @@
 
                             <td>
                                 <span class="number-value">
-                                    {{ number_format($remainingSpins) }}
+                                    {{
+                                        number_format(
+                                            $remainingSpins
+                                        )
+                                    }}
                                 </span>
                             </td>
 
@@ -613,8 +801,18 @@
                             </td>
 
                             <td>
-                                <span class="status-badge {{ $subCampaign->status === 'active' ? 'status-active' : 'status-inactive' }}">
-                                    {{ ucfirst($subCampaign->status) }}
+                                <span
+                                    class="status-badge {{
+                                        $subCampaign->status === 'active'
+                                            ? 'status-active'
+                                            : 'status-inactive'
+                                    }}"
+                                >
+                                    {{
+                                        ucfirst(
+                                            $subCampaign->status
+                                        )
+                                    }}
                                 </span>
                             </td>
 
@@ -623,7 +821,10 @@
                                     <a
                                         href="{{ route(
                                             'portal.spin-campaigns.sub-campaigns.edit',
-                                            [$campaign, $subCampaign]
+                                            [
+                                                $campaign,
+                                                $subCampaign,
+                                            ]
                                         ) }}"
                                         class="edit-btn"
                                     >
@@ -634,14 +835,20 @@
                                         method="POST"
                                         action="{{ route(
                                             'portal.spin-campaigns.sub-campaigns.destroy',
-                                            [$campaign, $subCampaign]
+                                            [
+                                                $campaign,
+                                                $subCampaign,
+                                            ]
                                         ) }}"
                                         onsubmit="return confirm('Delete this subcampaign?');"
                                     >
                                         @csrf
                                         @method('DELETE')
 
-                                        <button type="submit" class="delete-btn">
+                                        <button
+                                            type="submit"
+                                            class="delete-btn"
+                                        >
                                             Delete
                                         </button>
                                     </form>
@@ -650,13 +857,21 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="empty-state">
-                                <div class="empty-icon">🎯</div>
+                            <td
+                                colspan="11"
+                                class="empty-state"
+                            >
+                                <div class="empty-icon">
+                                    🎯
+                                </div>
 
-                                <h3>No subcampaigns found</h3>
+                                <h3>
+                                    No subcampaigns found
+                                </h3>
 
                                 <p>
-                                    Add the first rule for this main campaign.
+                                    Add the first rule for this
+                                    main campaign.
                                 </p>
 
                                 <a
@@ -675,7 +890,7 @@
             </table>
         </div>
 
-        @if ($subCampaigns->hasPages())
+        @if($subCampaigns->hasPages())
             <div class="pagination-wrap">
                 {{ $subCampaigns->links() }}
             </div>

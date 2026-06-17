@@ -42,6 +42,22 @@
         $isActive =
             (string) $campaign->status === '1'
             || $campaign->status === 'active';
+
+        /*
+         * Main campaign hidden special-spin reward.
+         *
+         * Only the configured discount and status are shown.
+         * The hidden subcampaign and spin position are not displayed.
+         */
+        $mainSpecialReward = $campaign->mainSpecialReward;
+
+        $hasActiveSpecialSpin =
+            $mainSpecialReward
+            && $mainSpecialReward->status === 'active';
+
+        $specialSpinUsed =
+            $mainSpecialReward
+            && (bool) $mainSpecialReward->is_used;
     @endphp
 
     <div class="campaign-stats-grid">
@@ -75,6 +91,27 @@
             <strong>
                 {{ number_format($totalSpinsUsed) }}
             </strong>
+        </div>
+
+        <div class="stat-card">
+            <span>Special Spin</span>
+
+            <strong>
+                @if($hasActiveSpecialSpin)
+                    {{ number_format(
+                        (float) $mainSpecialReward->special_discount,
+                        2
+                    ) }}%
+                @else
+                    Disabled
+                @endif
+            </strong>
+
+            @if($hasActiveSpecialSpin)
+                <small>
+                    {{ $specialSpinUsed ? 'Awarded' : 'Hidden position active' }}
+                </small>
+            @endif
         </div>
 
         <div class="stat-card">

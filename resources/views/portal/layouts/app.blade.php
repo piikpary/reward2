@@ -90,6 +90,50 @@
             gap: 14px;
         }
 
+        .sidebar-item {
+    margin: 5px 0;
+    list-style: none;
+}
+
+.sidebar-link {
+    min-height: 48px;
+    padding: 0 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 750;
+    transition: 0.2s ease;
+}
+
+.sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.sidebar-link.active {
+    background: #ffffff;
+    color: #0b1b2b;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.sidebar-icon {
+    width: 22px;
+    flex: 0 0 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.sidebar-text {
+    flex: 1;
+    white-space: nowrap;
+}
+
         .avatar-small {
             width: 42px;
             height: 42px;
@@ -705,6 +749,22 @@
                     <span class="sidebar-icon">📢</span>
                     <span class="sidebar-text">Announcements</span>
                 </a>
+                <li class="sidebar-item">
+                        <a
+                            href="{{ route('portal.special-spin-rewards.index') }}"
+                            class="sidebar-link {{
+                                request()->routeIs('portal.special-spin-rewards.*')
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <span class="sidebar-icon">🎁</span>
+
+                            <span class="sidebar-text">
+                                Special Spin Rewards
+                            </span>
+                        </a>
+                    </li>
 
                 <div class="nav-group">
                     <a

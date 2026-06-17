@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SpinCampaign extends Model
 {
@@ -56,5 +57,21 @@ class SpinCampaign extends Model
         SpinSubCampaign::class,
         'spin_campaign_id'
     )->orderByDesc('priority');
+}
+
+public function specialRewards(): HasMany
+{
+    return $this->hasMany(
+        SpinSpecialReward::class,
+        'spin_campaign_id'
+    );
+}
+
+public function mainSpecialReward(): HasOne
+{
+    return $this->hasOne(
+        SpinSpecialReward::class,
+        'scope_id'
+    )->where('scope_type', 'main_campaign');
 }
 }
