@@ -563,6 +563,9 @@ class SpinController extends Controller
 
         'description' =>
             "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}, case {$caseNumber}, spin {$spinNumber}",
+            
+        'special_reward_code' =>
+            null,
     ]);
 
     /*
@@ -597,6 +600,8 @@ class SpinController extends Controller
             $specialReward
                 ? "Special discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}"
                 : "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
+        'special_reward_code' =>
+            $specialReward?->reward_code,
     ]);
 
     $totalDiscountEarned +=

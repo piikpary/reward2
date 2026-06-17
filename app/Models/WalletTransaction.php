@@ -16,6 +16,7 @@ class WalletTransaction extends Model
         'from_user_id',
         'to_user_id',
         'description',
+        'special_reward_code',
     ];
 
     protected $casts = [

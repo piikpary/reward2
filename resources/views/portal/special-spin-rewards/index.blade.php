@@ -550,10 +550,8 @@
 
                             <td>
                                 {{
-                                    $reward->used_at
-                                        ? $reward->used_at->format(
-                                            'd M Y H:i'
-                                        )
+                                    $reward->redeemed_at
+                                        ? $reward->redeemed_at->format('d M Y H:i')
                                         : '-'
                                 }}
                             </td>

@@ -29,7 +29,7 @@ class TransactionController extends Controller
                     'amount' => (float) $transaction->amount,
                     'from' => $transaction->fromUser?->phone_number,
                     'to' => $transaction->toUser?->phone_number,
-                    'description' => $transaction->description,
+                    'special_reward_code' =>$transaction->special_reward_code,
                     'created_at' => $transaction->created_at?->format('Y-m-d H:i:s'),
                 ];
             });
