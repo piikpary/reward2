@@ -124,6 +124,35 @@
         background: #ffffff;
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
     }
+    .special-reward-list {
+    min-width: 190px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.special-reward-item {
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 11px;
+    background: #fafafa;
+}
+
+.special-reward-item small {
+    display: block;
+    margin-top: 5px;
+}
+
+.special-reward-link {
+    color: #6d28d9;
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.special-reward-link:hover {
+    text-decoration: underline;
+}
 
     .stat-card span {
         display: block;
@@ -587,11 +616,6 @@
         <div class="table-card-header">
             <div>
                 <h3>Subcampaign Rules</h3>
-
-                <p>
-                    Each rule can have different cases, spins per case,
-                    discount totals, and an optional hidden special spin.
-                </p>
             </div>
         </div>
 
@@ -640,16 +664,19 @@
                              *
                              * Do not display the assigned position.
                              */
-                            $specialReward =
-                                $subCampaign->specialReward;
+                            $specialRewards = $subCampaign
+                            ->specialRewards
+                            ->filter(function ($reward) {
+                                return
+                                    $reward->status === 'active'
+                                    || (string) $reward->status === '1'
+                                    || (bool) $reward->is_used;
+                            })
+                            ->sortBy('special_discount')
+                            ->values();
 
-                            $hasActiveSpecialSpin =
-                                $specialReward
-                                && $specialReward->status === 'active';
-
-                            $specialSpinUsed =
-                                $specialReward
-                                && (bool) $specialReward->is_used;
+                        $hasSpecialRewards =
+                            $specialRewards->isNotEmpty();
                         @endphp
 
                         <tr>
@@ -697,53 +724,96 @@
                                 </span>
                             </td>
 
-                           <td>
+                         <td>
     <div class="special-spin-cell">
-        @if($hasActiveSpecialSpin)
-            <span
-                class="special-spin-badge {{
-                    $specialSpinUsed
-                        ? 'special-spin-used'
-                        : 'special-spin-active'
-                }}"
-            >
-                {{
-                    number_format(
-                        (float) $specialReward->special_discount,
-                        2
-                    )
-                }}%
-            </span>
+        @if($hasSpecialRewards)
+            <div class="special-reward-list">
+                @foreach($specialRewards as $specialReward)
+                    @php
+                        $specialSpinUsed =
+                            (bool) $specialReward->is_used;
+                    @endphp
 
-            <small>
-                {{
-                    $specialSpinUsed
-                        ? 'Winner found'
-                        : 'Waiting for winner'
-                }}
-            </small>
+                    <div class="special-reward-item">
+                        <span
+                            class="special-spin-badge {{
+                                $specialSpinUsed
+                                    ? 'special-spin-used'
+                                    : 'special-spin-active'
+                            }}"
+                        >
+                            {{
+                                number_format(
+                                    (float) $specialReward
+                                        ->special_discount,
+                                    2
+                                )
+                            }}%
+                        </span>
 
-            <small>
-                Code:
-                {{ $specialReward->reward_code ?? '-' }}
-            </small>
+                        <small>
+                            {{
+                                $specialSpinUsed
+                                    ? 'Winner found'
+                                    : 'Waiting for winner'
+                            }}
+                        </small>
 
-            <small>
-                <a
-                    href="{{ route(
-                        'portal.special-spin-rewards.index',
-                        [
-                            'search' =>
-                                $specialReward->reward_code,
-                        ]
-                    ) }}"
-                >
-                    View record
-                </a>
-            </small>
+                        <small>
+                            Code:
+                            <strong>
+                                {{
+                                    $specialReward
+                                        ->reward_code
+                                        ?? '-'
+                                }}
+                            </strong>
+                        </small>
+
+                        @if($specialSpinUsed)
+                            <small>
+                                Winner:
+                                {{
+                                    $specialReward
+                                        ->winner
+                                        ? (
+                                            $specialReward
+                                                ->winner
+                                                ->phone_number
+                                            ?? $specialReward
+                                                ->winner
+                                                ->name
+                                            ?? 'Customer'
+                                        )
+                                        : 'Customer'
+                                }}
+                            </small>
+                        @endif
+
+                        <small>
+                            <a
+                                href="{{ route(
+                                    'portal.special-spin-rewards.index',
+                                    [
+                                        'search' =>
+                                            $specialReward
+                                                ->reward_code,
+                                    ]
+                                ) }}"
+                                class="special-reward-link"
+                            >
+                                View record
+                            </a>
+                        </small>
+                    </div>
+                @endforeach
+            </div>
         @else
             <span
-                class="special-spin-badge special-spin-disabled"
+                class="
+                    special-spin-badge
+                    special-spin-disabled
+                "
             >
                 Disabled
             </span>

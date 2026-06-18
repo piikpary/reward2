@@ -102,17 +102,6 @@ class SpinCampaignController extends Controller
                 'required',
                 'in:0,1',
             ],
-            'special_discount_enabled' => [
-                'nullable',
-                'boolean',
-            ],
-
-            'special_discount' => [
-                'nullable',
-                'required_if:special_discount_enabled,1',
-                'numeric',
-                'min:0.01',
-            ],
         ]);
 
         $validated['status'] = (int) $validated['status'];
@@ -199,7 +188,7 @@ class SpinCampaignController extends Controller
             'subCampaigns' => function ($query) {
                 $query->orderByDesc('priority');
             },
-            'mainSpecialReward',
+            'mainSpecialRewards',
         ]);
 
         return view('portal.spin-campaigns.edit', [
@@ -257,8 +246,12 @@ class SpinCampaignController extends Controller
             'boolean',
         ],
 
-        'special_discount' => [
+        'special_discounts' => [
             'nullable',
+            'array',
+        ],
+
+        'special_discounts.*' => [
             'required_if:special_discount_enabled,1',
             'numeric',
             'min:0.01',
@@ -300,11 +293,11 @@ class SpinCampaignController extends Controller
     */
 
     $campaignData = collect($validated)
-        ->except([
-            'special_discount_enabled',
-            'special_discount',
-        ])
-        ->toArray();
+    ->except([
+        'special_discount_enabled',
+        'special_discounts',
+    ])
+    ->toArray();
 
     try {
         DB::transaction(function () use (
@@ -331,15 +324,13 @@ class SpinCampaignController extends Controller
              * - stores the reward under main-campaign scope.
              */
             $specialRewardService
-                ->saveMainCampaignReward(
-                    $spinCampaign->fresh(),
-                    $request->boolean(
-                        'special_discount_enabled'
-                    ),
-                    isset($validated['special_discount'])
-                        ? (float) $validated['special_discount']
-                        : null
-                );
+            ->saveMainCampaignReward(
+                $spinCampaign->fresh(),
+                $request->boolean(
+                    'special_discount_enabled'
+                ),
+                $validated['special_discounts'] ?? []
+            );
         });
     } catch (\RuntimeException $exception) {
         return back()

@@ -21,12 +21,15 @@ class SpinSpecialReward extends Model
         'reward_code',
         'is_redeemed',
         'redeemed_at',
+        'discount_id',
+        'discount_auto_created',
     ];
 
     protected $casts = [
         'special_discount' => 'decimal:2',
         'spin_position' => 'integer',
         'is_used' => 'boolean',
+        'discount_auto_created' => 'boolean',
         'used_at' => 'datetime',
         'is_redeemed' => 'boolean',
         'redeemed_at' => 'datetime',
@@ -61,6 +64,12 @@ class SpinSpecialReward extends Model
     return $this->belongsTo(
         User::class,
         'used_by_user_id'
+    );
+}
+public function discount(): BelongsTo
+{
+    return $this->belongsTo(
+        Discount::class
     );
 }
 }

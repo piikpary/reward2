@@ -9,17 +9,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\SpinSpecialRewardService;
 
+
+
 class SpinSubCampaignController extends Controller
 {
-    public function index(SpinCampaign $campaign)
+   public function index(SpinCampaign $campaign)
 {
     $subCampaigns = $campaign->subCampaigns()
-    ->with([
-        'specialReward.winner',
-    ])
-    ->orderByDesc('priority')
-    ->latest()
-    ->paginate(10);
+        ->with([
+            'specialRewards.winner',
+        ])
+        ->orderByDesc('priority')
+        ->latest()
+        ->paginate(10);
 
     return view(
         'portal.spin-sub-campaigns.index',
@@ -85,8 +87,12 @@ class SpinSubCampaignController extends Controller
             'boolean',
         ],
 
-        'special_discount' => [
+        'special_discounts' => [
             'nullable',
+            'array',
+        ],
+
+        'special_discounts.*' => [
             'required_if:special_discount_enabled,1',
             'numeric',
             'min:0.01',
@@ -105,11 +111,11 @@ class SpinSubCampaignController extends Controller
              * spin_sub_campaigns table.
              */
             $subCampaignData = collect($validated)
-                ->except([
-                    'special_discount_enabled',
-                    'special_discount',
-                ])
-                ->toArray();
+            ->except([
+                'special_discount_enabled',
+                'special_discounts',
+            ])
+            ->toArray();
 
             $subCampaignData['spin_campaign_id'] =
                 $campaign->id;
@@ -131,16 +137,14 @@ class SpinSubCampaignController extends Controller
                     $request->boolean(
                         'special_discount_enabled'
                     ),
-                    isset($validated['special_discount'])
-                        ? (float) $validated['special_discount']
-                        : null
+                    $validated['special_discounts'] ?? []
                 );
         });
     } catch (\RuntimeException $exception) {
         return back()
             ->withInput()
             ->withErrors([
-                'special_discount' =>
+                'special_discounts' =>
                     $exception->getMessage(),
             ]);
     }
@@ -165,7 +169,7 @@ class SpinSubCampaignController extends Controller
         $subCampaign
     );
 
-    $subCampaign->load('specialReward');
+    $subCampaign->load('specialRewards');
 
     return view(
         'portal.spin-sub-campaigns.edit',
@@ -226,8 +230,12 @@ class SpinSubCampaignController extends Controller
             'boolean',
         ],
 
-        'special_discount' => [
+        'special_discounts' => [
             'nullable',
+            'array',
+        ],
+
+        'special_discounts.*' => [
             'required_if:special_discount_enabled,1',
             'numeric',
             'min:0.01',
@@ -283,11 +291,11 @@ class SpinSubCampaignController extends Controller
              * spin_sub_campaigns update.
              */
             $subCampaignData = collect($validated)
-                ->except([
-                    'special_discount_enabled',
-                    'special_discount',
-                ])
-                ->toArray();
+            ->except([
+                'special_discount_enabled',
+                'special_discounts',
+            ])
+            ->toArray();
 
             $subCampaign->update(
                 $subCampaignData
@@ -305,16 +313,14 @@ class SpinSubCampaignController extends Controller
                     $request->boolean(
                         'special_discount_enabled'
                     ),
-                    isset($validated['special_discount'])
-                        ? (float) $validated['special_discount']
-                        : null
+                    $validated['special_discounts'] ?? []
                 );
         });
     } catch (\RuntimeException $exception) {
         return back()
             ->withInput()
             ->withErrors([
-                'special_discount' =>
+                'special_discounts' =>
                     $exception->getMessage(),
             ]);
     }

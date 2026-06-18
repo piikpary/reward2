@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\SpinSpecialReward;
+use App\Services\SpinSpecialRewardService;
 
 class SpinController extends Controller
 {
@@ -25,7 +26,8 @@ class SpinController extends Controller
 
     public function getDiscount(
         Request $request,
-        WalletService $walletService
+        WalletService $walletService,
+        SpinSpecialRewardService $specialRewardService
     ): JsonResponse {
         /*
         |--------------------------------------------------------------------------
@@ -59,7 +61,8 @@ class SpinController extends Controller
         try {
             $result = DB::transaction(function () use (
                 $user,
-                $qty
+                $qty,
+                $specialRewardService
             ) {
                 /*
                 |--------------------------------------------------------------------------
@@ -523,15 +526,32 @@ class SpinController extends Controller
     */
 
     if ($specialReward) {
-        $specialReward->update([
-            'is_used' => true,
+    $updated = SpinSpecialReward::query()
+        ->whereKey($specialReward->id)
+        ->where('is_used', false)
+        ->update([
+            'is_used' =>
+                true,
+
             'used_by_user_id' =>
                 $user->id,
 
             'used_at' =>
                 now(),
         ]);
+
+    if ($updated !== 1) {
+        throw new \RuntimeException(
+            'This special reward has already been awarded.'
+        );
     }
+
+    $specialReward->refresh();
+
+    $specialRewardService->handleRewardWon(
+        $specialReward
+    );
+}
 
     /*
     |--------------------------------------------------------------------------

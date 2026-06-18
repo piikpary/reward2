@@ -67,11 +67,16 @@ public function specialRewards(): HasMany
     );
 }
 
-public function mainSpecialReward(): HasOne
+
+public function mainSpecialRewards()
 {
-    return $this->hasOne(
+    return $this->hasMany(
         SpinSpecialReward::class,
         'scope_id'
-    )->where('scope_type', 'main_campaign');
+    )
+        ->where(
+            'scope_type',
+            'main_campaign'
+        );
 }
 }

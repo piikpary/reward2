@@ -267,7 +267,7 @@
             <input
                 id="special_discount"
                 type="number"
-                name="special_discount"
+                name="special_discounts[]"
                 value="{{ $specialDiscountValue }}"
                 min="0.01"
                 step="0.01"

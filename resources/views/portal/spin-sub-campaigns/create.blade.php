@@ -221,6 +221,73 @@
         border-radius: 16px;
         background: #faf8ff;
     }
+    .special-discount-list {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+}
+
+.special-discount-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.special-discount-field {
+    min-width: 0;
+}
+
+.add-special-btn,
+.remove-special-btn {
+    min-height: 46px;
+    padding: 0 17px;
+    border-radius: 11px;
+    font-size: 13px;
+    font-weight: 850;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.add-special-btn {
+    margin-top: 15px;
+    border: 1px solid #6d28d9;
+    background: #6d28d9;
+    color: #ffffff;
+}
+
+.remove-special-btn {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.add-special-btn:hover,
+.remove-special-btn:hover {
+    transform: translateY(-1px);
+}
+
+.add-special-btn:disabled,
+.remove-special-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    transform: none;
+}
+
+.special-spin-disabled {
+    opacity: 0.65;
+}
+
+@media (max-width: 700px) {
+    .special-discount-row {
+        grid-template-columns: 1fr;
+    }
+
+    .remove-special-btn {
+        width: 100%;
+    }
+}
 
     .special-spin-heading {
         margin: 0 0 16px;
@@ -340,13 +407,21 @@
 </style>
 
 @php
-    $specialDiscountEnabled = old(
-        'special_discount_enabled',
-        false
+    $specialDiscountValues = old(
+        'special_discounts',
+        ['']
     );
 
-    $specialDiscountValue = old(
-        'special_discount'
+    if (
+        !is_array($specialDiscountValues)
+        || empty($specialDiscountValues)
+    ) {
+        $specialDiscountValues = [''];
+    }
+
+    $specialDiscountEnabled = (bool) old(
+        'special_discount_enabled',
+        false
     );
 @endphp
 
@@ -586,82 +661,113 @@
                     @enderror
                 </div>
 
-                <div class="special-spin-box">
-                    <h3 class="special-spin-heading">
-                        Special Spin Discount
-                    </h3>
+                <div
+    id="special-spin-box"
+    class="special-spin-box"
+>
+    <h3 class="special-spin-heading">
+        Special Spin Discounts
+    </h3>
 
-                    <div class="special-spin-grid">
-                        <div class="form-group">
-                            <label
-                                for="special_discount_enabled"
-                                class="checkbox-label"
-                            >
-                                <input
-                                    id="special_discount_enabled"
-                                    type="checkbox"
-                                    name="special_discount_enabled"
-                                    value="1"
-                                    @checked($specialDiscountEnabled)
-                                >
+    <div class="form-group">
+        <input
+            type="hidden"
+            name="special_discount_enabled"
+            value="0"
+        >
 
-                                Enable Special Spin Discount
-                            </label>
+        <label
+            for="special_discount_enabled"
+            class="checkbox-label"
+        >
+            <input
+                id="special_discount_enabled"
+                type="checkbox"
+                name="special_discount_enabled"
+                value="1"
+                @checked($specialDiscountEnabled)
+            >
 
-                            <p class="helper-text">
-                                The system will randomly assign this reward to
-                                one hidden, unused spin position inside this
-                                subcampaign.
-                            </p>
+            Enable Special Spin Discounts
+        </label>
 
-                            @error('special_discount_enabled')
-                                <span class="error-text">
-                                    {{ $message }}
-                                </span>
-                            @enderror
-                        </div>
+        <p class="helper-text">
+            Every special discount receives its own hidden random
+            position inside the existing subcampaign spin quota.
+            Adding rewards does not increase the total number of spins.
+        </p>
 
-                        <div class="form-group">
-                            <label
-                                class="form-label"
-                                for="special_discount"
-                            >
-                                Special Spin Discount (%)
+        @error('special_discount_enabled')
+            <span class="error-text">
+                {{ $message }}
+            </span>
+        @enderror
+    </div>
 
-                                @if($specialDiscountEnabled)
-                                    <span class="required">*</span>
-                                @endif
-                            </label>
+    <div
+        id="special-discount-list"
+        class="special-discount-list"
+    >
+        @foreach($specialDiscountValues as $index => $discountValue)
+            <div class="special-discount-row">
+                <div class="special-discount-field">
+                    <label class="form-label">
+                        Special Spin Discount (%)
+                        <span class="required">*</span>
+                    </label>
 
-                            <div class="input-wrap">
-                                <input
-                                    id="special_discount"
-                                    type="number"
-                                    name="special_discount"
-                                    class="form-control"
-                                    value="{{ $specialDiscountValue }}"
-                                    min="0.01"
-                                    step="0.01"
-                                    placeholder="Example: 100"
-                                >
+                    <div class="input-wrap">
+                        <input
+                            type="number"
+                            name="special_discounts[]"
+                            class="form-control special-discount-input"
+                            value="{{ $discountValue }}"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="Example: 100"
+                        >
 
-                                <span class="input-suffix">%</span>
-                            </div>
-
-                            <p class="helper-text">
-                                This replaces one normal spin result when the
-                                hidden winning position is reached. It does not
-                                increase the total number of spins.
-                            </p>
-
-                            @error('special_discount')
-                                <span class="error-text">
-                                    {{ $message }}
-                                </span>
-                            @enderror
-                        </div>
+                        <span class="input-suffix">
+                            %
+                        </span>
                     </div>
                 </div>
+
+                <button
+                    type="button"
+                    class="remove-special-btn"
+                >
+                    Remove
+                </button>
+            </div>
+        @endforeach
+    </div>
+
+    <button
+        type="button"
+        id="add-special-discount"
+        class="add-special-btn"
+    >
+        + Add Special Discount
+    </button>
+
+    <p class="helper-text">
+        Each row creates one separate special spin reward,
+        one hidden position, and one unique verification code.
+    </p>
+
+    @error('special_discounts')
+        <span class="error-text">
+            {{ $message }}
+        </span>
+    @enderror
+
+    @error('special_discounts.*')
+        <span class="error-text">
+            {{ $message }}
+        </span>
+    @enderror
+</div>
 
                 <div class="form-group full-width">
                     <label class="form-label" for="description">
@@ -703,3 +809,127 @@
     </form>
 </div>
 @endsection
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const enabledCheckbox = document.getElementById(
+        'special_discount_enabled'
+    );
+
+    const specialSpinBox = document.getElementById(
+        'special-spin-box'
+    );
+
+    const list = document.getElementById(
+        'special-discount-list'
+    );
+
+    const addButton = document.getElementById(
+        'add-special-discount'
+    );
+
+    function createSpecialDiscountRow() {
+        const row = document.createElement('div');
+
+        row.className = 'special-discount-row';
+
+        row.innerHTML = `
+            <div class="special-discount-field">
+                <label class="form-label">
+                    Special Spin Discount (%)
+                    <span class="required">*</span>
+                </label>
+
+                <div class="input-wrap">
+                    <input
+                        type="number"
+                        name="special_discounts[]"
+                        class="form-control special-discount-input"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Example: 100"
+                    >
+
+                    <span class="input-suffix">%</span>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="remove-special-btn"
+            >
+                Remove
+            </button>
+        `;
+
+        return row;
+    }
+
+    function updateSpecialDiscountState() {
+        const enabled = enabledCheckbox.checked;
+
+        specialSpinBox.classList.toggle(
+            'special-spin-disabled',
+            !enabled
+        );
+
+        list.querySelectorAll(
+            '.special-discount-input'
+        ).forEach(function (input) {
+            input.disabled = !enabled;
+            input.required = enabled;
+        });
+
+        list.querySelectorAll(
+            '.remove-special-btn'
+        ).forEach(function (button) {
+            button.disabled = !enabled;
+        });
+
+        addButton.disabled = !enabled;
+    }
+
+    addButton.addEventListener('click', function () {
+        list.appendChild(
+            createSpecialDiscountRow()
+        );
+
+        updateSpecialDiscountState();
+    });
+
+    list.addEventListener('click', function (event) {
+        if (
+            !event.target.classList.contains(
+                'remove-special-btn'
+            )
+        ) {
+            return;
+        }
+
+        const rows = list.querySelectorAll(
+            '.special-discount-row'
+        );
+
+        const currentRow = event.target.closest(
+            '.special-discount-row'
+        );
+
+        if (rows.length > 1) {
+            currentRow.remove();
+        } else {
+            const input = currentRow.querySelector(
+                '.special-discount-input'
+            );
+
+            input.value = '';
+        }
+    });
+
+    enabledCheckbox.addEventListener(
+        'change',
+        updateSpecialDiscountState
+    );
+
+    updateSpecialDiscountState();
+});
+</script>

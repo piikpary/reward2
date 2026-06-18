@@ -70,11 +70,11 @@ class SpinSubCampaign extends Model
             $this->total_allowed_spins - $this->total_spins_used
         );
     }
-    public function specialReward(): HasOne
-    {
-        return $this->hasOne(
-            SpinSpecialReward::class,
-            'scope_id'
-        )->where('scope_type', 'sub_campaign');
-    }
+    public function specialRewards()
+{
+    return $this->hasMany(
+        SpinSpecialReward::class,
+        'assigned_sub_campaign_id'
+    );
+}
 }

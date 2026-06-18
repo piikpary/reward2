@@ -134,6 +134,105 @@
         font-weight: 850;
     }
 
+.special-discount-list {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+}
+
+.special-discount-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.special-discount-field {
+    min-width: 0;
+}
+
+.add-special-btn,
+.remove-special-btn {
+    min-height: 46px;
+    padding: 0 17px;
+    border-radius: 11px;
+    font-size: 13px;
+    font-weight: 850;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.add-special-btn {
+    margin-top: 15px;
+    border: 1px solid #6d28d9;
+    background: #6d28d9;
+    color: #ffffff;
+}
+
+.remove-special-btn {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.add-special-btn:disabled,
+.remove-special-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.special-spin-disabled {
+    opacity: 0.65;
+}
+
+.used-special-list {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #ddd6fe;
+}
+
+.used-special-title {
+    margin: 0 0 12px;
+    color: #92400e;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.used-special-item {
+    margin-top: 9px;
+    padding: 11px 13px;
+    border: 1px solid #fde68a;
+    border-radius: 11px;
+    background: #fffbeb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.used-special-item strong {
+    color: #92400e;
+}
+
+.used-special-item small {
+    color: #a16207;
+}
+
+@media (max-width: 700px) {
+    .special-discount-row {
+        grid-template-columns: 1fr;
+    }
+
+    .remove-special-btn {
+        width: 100%;
+    }
+
+    .used-special-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
     .required {
         color: #dc2626;
     }
@@ -341,25 +440,41 @@
 
 @php
     /*
-     * Hidden special-spin configuration for this subcampaign.
-     * The random position is not displayed in the portal.
+     * Unused rewards can still be edited.
+     * Already-won rewards remain as historical records.
      */
-    $specialReward = $subCampaign->specialReward;
+    $unusedSpecialRewards = $subCampaign
+        ->specialRewards
+        ->filter(function ($reward) {
+            return !(bool) $reward->is_used;
+        })
+        ->values();
 
-    $specialDiscountEnabled = old(
+    $usedSpecialRewards = $subCampaign
+        ->specialRewards
+        ->filter(function ($reward) {
+            return (bool) $reward->is_used;
+        })
+        ->values();
+
+    $specialDiscountValues = old(
+        'special_discounts',
+        $unusedSpecialRewards
+            ->pluck('special_discount')
+            ->toArray()
+    );
+
+    if (
+        !is_array($specialDiscountValues)
+        || empty($specialDiscountValues)
+    ) {
+        $specialDiscountValues = [''];
+    }
+
+    $specialDiscountEnabled = (bool) old(
         'special_discount_enabled',
-        $specialReward
-            && $specialReward->status === 'active'
+        $unusedSpecialRewards->isNotEmpty()
     );
-
-    $specialDiscountValue = old(
-        'special_discount',
-        $specialReward?->special_discount
-    );
-
-    $specialSpinUsed =
-        $specialReward
-        && (bool) $specialReward->is_used;
 @endphp
 
 <div class="sub-page">
@@ -601,91 +716,146 @@
                     @enderror
                 </div>
 
-                <div class="special-spin-box">
-                    <h3 class="special-spin-heading">
-                        Special Spin Discount
-                    </h3>
+                <div
+    id="special-spin-box"
+    class="special-spin-box"
+>
+    <h3 class="special-spin-heading">
+        Special Spin Discounts
+    </h3>
 
-                    <div class="special-spin-grid">
-                        <div class="form-group">
-                            <label
-                                for="special_discount_enabled"
-                                class="checkbox-label"
-                            >
-                                <input
-                                    id="special_discount_enabled"
-                                    type="checkbox"
-                                    name="special_discount_enabled"
-                                    value="1"
-                                    @checked($specialDiscountEnabled)
-                                    @disabled($specialSpinUsed)
-                                >
+    <div class="form-group">
+        <input
+            type="hidden"
+            name="special_discount_enabled"
+            value="0"
+        >
 
-                                Enable Special Spin Discount
-                            </label>
+        <label
+            for="special_discount_enabled"
+            class="checkbox-label"
+        >
+            <input
+                id="special_discount_enabled"
+                type="checkbox"
+                name="special_discount_enabled"
+                value="1"
+                @checked($specialDiscountEnabled)
+            >
 
-                            <p class="helper-text">
-                                The system randomly assigns this reward to one
-                                hidden, unused position inside the existing
-                                subcampaign spin quota.
-                            </p>
+            Enable Special Spin Discounts
+        </label>
 
-                            @error('special_discount_enabled')
-                                <span class="error-text">
-                                    {{ $message }}
-                                </span>
-                            @enderror
-                        </div>
+        <p class="helper-text">
+            Each unused special discount receives its own hidden
+            random position. Rewards already won remain unchanged
+            as historical records.
+        </p>
 
-                        <div class="form-group">
-                            <label
-                                class="form-label"
-                                for="special_discount"
-                            >
-                                Special Spin Discount (%)
+        @error('special_discount_enabled')
+            <span class="error-text">
+                {{ $message }}
+            </span>
+        @enderror
+    </div>
 
-                                @if($specialDiscountEnabled)
-                                    <span class="required">*</span>
-                                @endif
-                            </label>
+    <div
+        id="special-discount-list"
+        class="special-discount-list"
+    >
+        @foreach($specialDiscountValues as $discountValue)
+            <div class="special-discount-row">
+                <div class="special-discount-field">
+                    <label class="form-label">
+                        Special Spin Discount (%)
+                        <span class="required">*</span>
+                    </label>
 
-                            <div class="input-wrap">
-                                <input
-                                    id="special_discount"
-                                    type="number"
-                                    name="special_discount"
-                                    class="form-control"
-                                    value="{{ $specialDiscountValue }}"
-                                    min="0.01"
-                                    step="0.01"
-                                    placeholder="Example: 100"
-                                    @disabled($specialSpinUsed)
-                                >
+                    <div class="input-wrap">
+                        <input
+                            type="number"
+                            name="special_discounts[]"
+                            class="form-control special-discount-input"
+                            value="{{ $discountValue }}"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="Example: 100"
+                        >
 
-                                <span class="input-suffix">%</span>
-                            </div>
+                        <span class="input-suffix">
+                            %
+                        </span>
+                    </div>
+                </div>
 
-                            <p class="helper-text">
-                                This replaces one normal spin result when the
-                                hidden winning position is reached. It does not
-                                increase the total number of spins.
-                            </p>
+                <button
+                    type="button"
+                    class="remove-special-btn"
+                >
+                    Remove
+                </button>
+            </div>
+        @endforeach
+    </div>
 
-                            @error('special_discount')
-                                <span class="error-text">
-                                    {{ $message }}
-                                </span>
-                            @enderror
-                        </div>
+    <button
+        type="button"
+        id="add-special-discount"
+        class="add-special-btn"
+    >
+        + Add Special Discount
+    </button>
+
+    <p class="helper-text">
+        Removing a row removes only an unused special reward.
+        Previously awarded rewards are never deleted.
+    </p>
+
+    @error('special_discounts')
+        <span class="error-text">
+            {{ $message }}
+        </span>
+    @enderror
+
+    @error('special_discounts.*')
+        <span class="error-text">
+            {{ $message }}
+        </span>
+    @enderror
+
+    @if($usedSpecialRewards->isNotEmpty())
+        <div class="used-special-list">
+            <h4 class="used-special-title">
+                Already Awarded Special Rewards
+            </h4>
+
+            @foreach($usedSpecialRewards as $usedReward)
+                <div class="used-special-item">
+                    <div>
+                        <strong>
+                            {{
+                                number_format(
+                                    (float) $usedReward
+                                        ->special_discount,
+                                    2
+                                )
+                            }}%
+                        </strong>
+
+                        <small>
+                            Code:
+                            {{ $usedReward->reward_code ?? '-' }}
+                        </small>
                     </div>
 
-                    @if($specialSpinUsed)
-                        <span class="error-text">
-                            This special spin reward has already been awarded
-                            and cannot be changed.
-                        </span>
-                    @endif
+                    <small>
+                        Winner recorded
+                    </small>
                 </div>
+            @endforeach
+        </div>
+    @endif
+</div>
 
                 <div class="form-group full-width">
                     <label class="form-label" for="description">
@@ -724,3 +894,127 @@
     </form>
 </div>
 @endsection
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const enabledCheckbox = document.getElementById(
+        'special_discount_enabled'
+    );
+
+    const specialSpinBox = document.getElementById(
+        'special-spin-box'
+    );
+
+    const list = document.getElementById(
+        'special-discount-list'
+    );
+
+    const addButton = document.getElementById(
+        'add-special-discount'
+    );
+
+    function createSpecialDiscountRow() {
+        const row = document.createElement('div');
+
+        row.className = 'special-discount-row';
+
+        row.innerHTML = `
+            <div class="special-discount-field">
+                <label class="form-label">
+                    Special Spin Discount (%)
+                    <span class="required">*</span>
+                </label>
+
+                <div class="input-wrap">
+                    <input
+                        type="number"
+                        name="special_discounts[]"
+                        class="form-control special-discount-input"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Example: 100"
+                    >
+
+                    <span class="input-suffix">%</span>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="remove-special-btn"
+            >
+                Remove
+            </button>
+        `;
+
+        return row;
+    }
+
+    function updateSpecialDiscountState() {
+        const enabled = enabledCheckbox.checked;
+
+        specialSpinBox.classList.toggle(
+            'special-spin-disabled',
+            !enabled
+        );
+
+        list.querySelectorAll(
+            '.special-discount-input'
+        ).forEach(function (input) {
+            input.disabled = !enabled;
+            input.required = enabled;
+        });
+
+        list.querySelectorAll(
+            '.remove-special-btn'
+        ).forEach(function (button) {
+            button.disabled = !enabled;
+        });
+
+        addButton.disabled = !enabled;
+    }
+
+    addButton.addEventListener('click', function () {
+        list.appendChild(
+            createSpecialDiscountRow()
+        );
+
+        updateSpecialDiscountState();
+    });
+
+    list.addEventListener('click', function (event) {
+        if (
+            !event.target.classList.contains(
+                'remove-special-btn'
+            )
+        ) {
+            return;
+        }
+
+        const rows = list.querySelectorAll(
+            '.special-discount-row'
+        );
+
+        const currentRow = event.target.closest(
+            '.special-discount-row'
+        );
+
+        if (rows.length > 1) {
+            currentRow.remove();
+        } else {
+            const input = currentRow.querySelector(
+                '.special-discount-input'
+            );
+
+            input.value = '';
+        }
+    });
+
+    enabledCheckbox.addEventListener(
+        'change',
+        updateSpecialDiscountState
+    );
+
+    updateSpecialDiscountState();
+});
+</script>
