@@ -9,16 +9,16 @@ use App\Models\SpinCampaign;
 use App\Models\SpinCaseSequence;
 use App\Models\SpinResult;
 use App\Models\SpinSpecialCase;
+use App\Models\SpinSpecialReward;
 use App\Models\SpinSubCampaign;
 use App\Models\UserWallet;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Services\SpinSpecialRewardService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Models\SpinSpecialReward;
-use App\Services\SpinSpecialRewardService;
 
 class SpinController extends Controller
 {
@@ -29,22 +29,6 @@ class SpinController extends Controller
         WalletService $walletService,
         SpinSpecialRewardService $specialRewardService
     ): JsonResponse {
-        /*
-        |--------------------------------------------------------------------------
-        | Mobile request
-        |--------------------------------------------------------------------------
-        |
-        | Mobile sends:
-        |
-        | {
-        |     "qty": 1
-        | }
-        |
-        | The maximum qty is dynamic and comes from the selected
-        | subcampaign's spins_per_case value.
-        |
-        */
-
         $validated = $request->validate([
             'qty' => [
                 'required',
@@ -64,12 +48,6 @@ class SpinController extends Controller
                 $qty,
                 $specialRewardService
             ) {
-                /*
-                |--------------------------------------------------------------------------
-                | Get wallet definitions
-                |--------------------------------------------------------------------------
-                */
-
                 $spinWallet = Wallet::query()
                     ->where('type', 'spin')
                     ->firstOrFail();
@@ -77,12 +55,6 @@ class SpinController extends Controller
                 $discountWallet = Wallet::query()
                     ->where('type', 'discount')
                     ->firstOrFail();
-
-                /*
-                |--------------------------------------------------------------------------
-                | Lock user wallet balances
-                |--------------------------------------------------------------------------
-                */
 
                 $userSpinWallet = UserWallet::query()
                     ->where('user_id', $user->id)
@@ -103,12 +75,6 @@ class SpinController extends Controller
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Find active main campaign
-                |--------------------------------------------------------------------------
-                */
-
                 $campaign = $this->getActiveCampaign();
 
                 if (!$campaign) {
@@ -117,20 +83,6 @@ class SpinController extends Controller
                         404
                     );
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Automatically select subcampaign
-                |--------------------------------------------------------------------------
-                |
-                | Selection:
-                |
-                | 1. Active subcampaign
-                | 2. Highest priority first
-                | 3. qty cannot exceed spins_per_case
-                | 4. Must have enough remaining quota
-                |
-                */
 
                 $subCampaigns = SpinSubCampaign::query()
                     ->where(
@@ -157,9 +109,6 @@ class SpinController extends Controller
                             return false;
                         }
 
-                        /*
-                         * Dynamic request limit.
-                         */
                         if ($qty > $spinsPerCase) {
                             return false;
                         }
@@ -182,12 +131,6 @@ class SpinController extends Controller
                         400
                     );
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Validate selected rule
-                |--------------------------------------------------------------------------
-                */
 
                 $totalCases =
                     (int) $subCampaign->total_cases;
@@ -240,12 +183,6 @@ class SpinController extends Controller
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Get active Discount List
-                |--------------------------------------------------------------------------
-                */
-
                 $discountList =
                     $this->getActiveDiscountList();
 
@@ -255,16 +192,6 @@ class SpinController extends Controller
                         400
                     );
                 }
-
-                /*
-                |--------------------------------------------------------------------------
-                | Create a new independent rotation batch
-                |--------------------------------------------------------------------------
-                |
-                | Each API request creates a new batch.
-                | It does not continue an older partial batch.
-                |
-                */
 
                 $lastCaseNumber = SpinCaseSequence::query()
                     ->where(
@@ -279,12 +206,6 @@ class SpinController extends Controller
 
                 $caseNumber =
                     ((int) $lastCaseNumber) + 1;
-
-                /*
-                |--------------------------------------------------------------------------
-                | Find special-case target
-                |--------------------------------------------------------------------------
-                */
 
                 $specialCase = SpinSpecialCase::query()
                     ->where(
@@ -310,19 +231,6 @@ class SpinController extends Controller
                 $caseTotalDiscount = $specialCase
                     ? (int) $specialCase->total_discount
                     : $normalDiscountTotal;
-
-                /*
-                |--------------------------------------------------------------------------
-                | Generate request sequence
-                |--------------------------------------------------------------------------
-                |
-                | qty == spins_per_case:
-                | exact total is required.
-                |
-                | qty < spins_per_case:
-                | random total must not exceed the configured target.
-                |
-                */
 
                 $requestSequence =
                     $this->generateRequestSequence(
@@ -355,12 +263,6 @@ class SpinController extends Controller
                     );
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Save request case sequence
-                |--------------------------------------------------------------------------
-                */
-
                 SpinCaseSequence::create([
                     'spin_campaign_id' =>
                         $campaign->id,
@@ -384,298 +286,205 @@ class SpinController extends Controller
                 $results = [];
                 $totalDiscountEarned = 0;
 
-                /*
-                |--------------------------------------------------------------------------
-                | Process generated spin results
-                |--------------------------------------------------------------------------
-                */
-
                 foreach (
-    $requestSequence
-    as $index => $normalDiscountPercentage
-) {
-    $spinNumber = $index + 1;
+                    $requestSequence
+                    as $index => $normalDiscountPercentage
+                ) {
+                    $spinNumber = $index + 1;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Existing global position inside the subcampaign
-    |--------------------------------------------------------------------------
-    |
-    | Example:
-    | total_spins_used before request = 20
-    | first result in this request     = position 21
-    | second result                    = position 22
-    |
-    | This does not add a new spin.
-    |
-    */
+                    $currentSpinPosition =
+                        (int) $subCampaign->total_spins_used
+                        + $spinNumber;
 
-    $currentSpinPosition =
-        (int) $subCampaign->total_spins_used
-        + $spinNumber;
+                    $specialReward = SpinSpecialReward::query()
+                        ->where(
+                            'spin_campaign_id',
+                            $campaign->id
+                        )
+                        ->where(
+                            'assigned_sub_campaign_id',
+                            $subCampaign->id
+                        )
+                        ->where(
+                            'spin_position',
+                            $currentSpinPosition
+                        )
+                        ->where('status', 'active')
+                        ->where('is_used', false)
+                        ->lockForUpdate()
+                        ->first();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find hidden special spin reward
-    |--------------------------------------------------------------------------
-    |
-    | This works for both:
-    | - main_campaign scope
-    | - sub_campaign scope
-    |
-    | The reward service has already assigned the reward to this
-    | selected subcampaign and one hidden spin position.
-    |
-    */
+                    $discountPercentage = $specialReward
+                        ? (float) $specialReward->special_discount
+                        : (float) $normalDiscountPercentage;
 
-    $specialReward = SpinSpecialReward::query()
-        ->where(
-            'spin_campaign_id',
-            $campaign->id
-        )
-        ->where(
-            'assigned_sub_campaign_id',
-            $subCampaign->id
-        )
-        ->where(
-            'spin_position',
-            $currentSpinPosition
-        )
-        ->where('status', 'active')
-        ->where('is_used', false)
-        ->lockForUpdate()
-        ->first();
+                    $userSpinWallet->balance =
+                        (float) $userSpinWallet->balance - 1;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Replace only the awarded discount
-    |--------------------------------------------------------------------------
-    |
-    | The request sequence remains normal so your existing case-total
-    | validation is not changed.
-    |
-    */
+                    $userSpinWallet->save();
 
-    $discountPercentage = $specialReward
-        ? (float) $specialReward->special_discount
-        : (float) $normalDiscountPercentage;
+                    $userDiscountWallet->balance =
+                        (float) $userDiscountWallet->balance
+                        + $discountPercentage;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Deduct one spin
-    |--------------------------------------------------------------------------
-    */
+                    $userDiscountWallet->save();
 
-    $userSpinWallet->balance =
-        (float) $userSpinWallet->balance - 1;
+                    SpinResult::create([
+                        'spin_campaign_id' =>
+                            $campaign->id,
 
-    $userSpinWallet->save();
+                        'spin_sub_campaign_id' =>
+                            $subCampaign->id,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Add earned discount
-    |--------------------------------------------------------------------------
-    |
-    | If this is the hidden winning position, the wallet receives
-    | the special discount instead of the normal discount.
-    |
-    */
+                        'user_id' =>
+                            $user->id,
 
-    $userDiscountWallet->balance =
-        (float) $userDiscountWallet->balance
-        + $discountPercentage;
+                        'case_number' =>
+                            $caseNumber,
 
-    $userDiscountWallet->save();
+                        'spin_number' =>
+                            $spinNumber,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Save spin result
-    |--------------------------------------------------------------------------
-    */
+                        'discount_percentage' =>
+                            $discountPercentage,
 
-    SpinResult::create([
-        'spin_campaign_id' =>
-            $campaign->id,
+                        'case_total_discount' =>
+                            $caseTotalDiscount,
+                    ]);
 
-        'spin_sub_campaign_id' =>
-            $subCampaign->id,
+                    if ($specialReward) {
+                        $updated = SpinSpecialReward::query()
+                            ->whereKey($specialReward->id)
+                            ->where('is_used', false)
+                            ->update([
+                                'is_used' =>
+                                    true,
 
-        'user_id' =>
-            $user->id,
+                                'used_by_user_id' =>
+                                    $user->id,
 
-        'case_number' =>
-            $caseNumber,
+                                'used_at' =>
+                                    now(),
+                            ]);
 
-        'spin_number' =>
-            $spinNumber,
+                        if ($updated !== 1) {
+                            throw new \RuntimeException(
+                                'This special reward has already been awarded.'
+                            );
+                        }
 
-        'discount_percentage' =>
-            $discountPercentage,
+                        $specialReward->refresh();
 
-        'case_total_discount' =>
-            $caseTotalDiscount,
-    ]);
+                        $specialRewardService->handleRewardWon(
+                            $specialReward
+                        );
+                    }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Mark special reward as used
-    |--------------------------------------------------------------------------
-    |
-    | This prevents another customer from receiving the same reward.
-    |
-    */
+                    /*
+                     * Keep one discount transaction for every spin,
+                     * because each spin may have a different value.
+                     */
+                    WalletTransaction::create([
+                        'user_id' =>
+                            $user->id,
 
-    if ($specialReward) {
-    $updated = SpinSpecialReward::query()
-        ->whereKey($specialReward->id)
-        ->where('is_used', false)
-        ->update([
-            'is_used' =>
-                true,
+                        'wallet_id' =>
+                            $discountWallet->id,
 
-            'used_by_user_id' =>
-                $user->id,
+                        'transaction_type' =>
+                            'discount_earned',
 
-            'used_at' =>
-                now(),
-        ]);
+                        'wallet_type' =>
+                            'discount',
 
-    if ($updated !== 1) {
-        throw new \RuntimeException(
-            'This special reward has already been awarded.'
-        );
-    }
+                        'amount' =>
+                            $discountPercentage,
 
-    $specialReward->refresh();
+                        'from_user_id' =>
+                            null,
 
-    $specialRewardService->handleRewardWon(
-        $specialReward
-    );
-}
+                        'to_user_id' =>
+                            $user->id,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Spin wallet transaction
-    |--------------------------------------------------------------------------
-    */
+                        'description' =>
+                            $specialReward
+                                ? "Special discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}"
+                                : "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
 
-    WalletTransaction::create([
-        'user_id' =>
-            $user->id,
+                        'special_reward_code' =>
+                            $specialReward?->reward_code,
+                    ]);
 
-        'wallet_id' =>
-            $spinWallet->id,
+                    $totalDiscountEarned +=
+                        $discountPercentage;
 
-        'transaction_type' =>
-            'spin_used',
+                    $results[] = [
+                        'spin_no' =>
+                            $spinNumber,
 
-        'wallet_type' =>
-            'spin',
+                        'discount_percentage' =>
+                            $discountPercentage,
 
-        'amount' =>
-            1,
+                        'normal_discount_percentage' =>
+                            (float) $normalDiscountPercentage,
 
-        'from_user_id' =>
-            $user->id,
+                        'case_number' =>
+                            $caseNumber,
 
-        'to_user_id' =>
-            null,
+                        'spin_number' =>
+                            $spinNumber,
 
-        'description' =>
-            "Spin used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}, case {$caseNumber}, spin {$spinNumber}",
-            
-        'special_reward_code' =>
-            null,
-    ]);
+                        'is_special_case' =>
+                            $specialCase !== null,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Discount wallet transaction
-    |--------------------------------------------------------------------------
-    */
+                        'is_special_spin' =>
+                            $specialReward !== null,
 
-    WalletTransaction::create([
-        'user_id' =>
-            $user->id,
+                        'special_reward_scope' =>
+                            $specialReward?->scope_type,
 
-        'wallet_id' =>
-            $discountWallet->id,
-
-        'transaction_type' =>
-            'discount_earned',
-
-        'wallet_type' =>
-            'discount',
-
-        'amount' =>
-            $discountPercentage,
-
-        'from_user_id' =>
-            null,
-
-        'to_user_id' =>
-            $user->id,
-
-        'description' =>
-            $specialReward
-                ? "Special discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, position {$currentSpinPosition}"
-                : "Discount {$discountPercentage}% earned: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}, spin {$spinNumber}",
-        'special_reward_code' =>
-            $specialReward?->reward_code,
-    ]);
-
-    $totalDiscountEarned +=
-        $discountPercentage;
-
-    $results[] = [
-        'spin_no' =>
-            $spinNumber,
-
-        /*
-         * Actual discount received by the customer.
-         */
-        'discount_percentage' =>
-            $discountPercentage,
-
-        /*
-         * Original normal value before replacement.
-         */
-        'normal_discount_percentage' =>
-            (float) $normalDiscountPercentage,
-
-        'case_number' =>
-            $caseNumber,
-
-        'spin_number' =>
-            $spinNumber,
-
-        /*
-         * Existing fixed special-case concept.
-         */
-        'is_special_case' =>
-            $specialCase !== null,
-
-        /*
-         * New hidden special-spin concept.
-         */
-        'is_special_spin' =>
-            $specialReward !== null,
-
-        'special_reward_scope' =>
-            $specialReward?->scope_type,
-
-        'special_reward_code' =>
-            $specialReward
-                ? $specialReward->reward_code
-                : null,
-    ];
-}
+                        'special_reward_code' =>
+                            $specialReward?->reward_code,
+                    ];
+                }
 
                 /*
-                |--------------------------------------------------------------------------
-                | Update spin quota progress
-                |--------------------------------------------------------------------------
-                */
+                 * Save only one spin-used transaction for the
+                 * complete API request.
+                 *
+                 * qty 1 = amount 1
+                 * qty 2 = amount 2
+                 * qty 3 = amount 3
+                 * qty 4 = amount 4
+                 */
+                WalletTransaction::create([
+                    'user_id' =>
+                        $user->id,
+
+                    'wallet_id' =>
+                        $spinWallet->id,
+
+                    'transaction_type' =>
+                        'spin_used',
+
+                    'wallet_type' =>
+                        'spin',
+
+                    'amount' =>
+                        $qty,
+
+                    'from_user_id' =>
+                        $user->id,
+
+                    'to_user_id' =>
+                        null,
+
+                    'description' =>
+                        "{$qty} spin(s) used: campaign {$campaign->id}, subcampaign {$subCampaign->id}, case {$caseNumber}",
+
+                    'special_reward_code' =>
+                        null,
+                ]);
 
                 $subCampaign->total_spins_used =
                     (int) $subCampaign->total_spins_used
@@ -683,9 +492,6 @@ class SpinController extends Controller
 
                 $subCampaign->save();
 
-                /*
-                 * Synchronize old parent counter temporarily.
-                 */
                 $campaign->total_spins_used =
                     (int) $campaign->subCampaigns()
                         ->sum('total_spins_used');
@@ -783,12 +589,6 @@ class SpinController extends Controller
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find active main campaign
-    |--------------------------------------------------------------------------
-    */
-
     private function getActiveCampaign(): ?SpinCampaign
     {
         $now = now();
@@ -807,12 +607,6 @@ class SpinController extends Controller
             ->lockForUpdate()
             ->first();
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Get active Discount List
-    |--------------------------------------------------------------------------
-    */
 
     private function getActiveDiscountList(): array
     {
@@ -836,103 +630,85 @@ class SpinController extends Controller
             ->toArray();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Generate one request sequence
-    |--------------------------------------------------------------------------
-    */
     private function findPartialSequence(
-    int $maximumTotal,
-    int $count,
-    array $discountList
-): ?array {
-    if ($count === 0) {
-        return [];
-    }
+        int $maximumTotal,
+        int $count,
+        array $discountList
+    ): ?array {
+        if ($count === 0) {
+            return [];
+        }
 
-    if ($maximumTotal <= 0) {
+        if ($maximumTotal <= 0) {
+            return null;
+        }
+
+        $values = array_values(
+            array_filter(
+                array_map('intval', $discountList),
+                fn ($value) => $value > 0
+            )
+        );
+
+        shuffle($values);
+
+        foreach ($values as $discount) {
+            if ($discount > $maximumTotal) {
+                continue;
+            }
+
+            $remainingSequence =
+                $this->findPartialSequence(
+                    $maximumTotal - $discount,
+                    $count - 1,
+                    $discountList
+                );
+
+            if ($remainingSequence !== null) {
+                return array_merge(
+                    [$discount],
+                    $remainingSequence
+                );
+            }
+        }
+
         return null;
     }
 
-    $values = array_values(
-        array_filter(
-            array_map('intval', $discountList),
-            fn ($value) => $value > 0
-        )
-    );
-
-    shuffle($values);
-
-    foreach ($values as $discount) {
-        if ($discount > $maximumTotal) {
-            continue;
+    private function generateRequestSequence(
+        int $qty,
+        int $spinsPerCase,
+        int $targetDiscount,
+        array $discountList
+    ): array {
+        if ($qty < 1 || $qty > $spinsPerCase) {
+            throw new \Exception(
+                "Quantity must be between 1 and {$spinsPerCase}.",
+                422
+            );
         }
 
-        $remainingSequence = $this->findPartialSequence(
-            $maximumTotal - $discount,
-            $count - 1,
+        $fullSequence = $this->findExactSequence(
+            $targetDiscount,
+            $spinsPerCase,
             $discountList
         );
 
-        if ($remainingSequence !== null) {
-            return array_merge(
-                [$discount],
-                $remainingSequence
+        if ($fullSequence === null) {
+            throw new \Exception(
+                "Cannot create {$spinsPerCase} spin results totaling exactly {$targetDiscount}% from the active Discount List.",
+                400
             );
         }
-    }
 
-    return null;
-}
+        shuffle($fullSequence);
 
-    private function generateRequestSequence(
-    int $qty,
-    int $spinsPerCase,
-    int $targetDiscount,
-    array $discountList
-): array {
-    if ($qty < 1 || $qty > $spinsPerCase) {
-        throw new \Exception(
-            "Quantity must be between 1 and {$spinsPerCase}.",
-            422
+        return array_slice(
+            $fullSequence,
+            0,
+            $qty
         );
     }
-
-    /*
-     * Build one valid complete sequence dynamically.
-     *
-     * $spinsPerCase and $targetDiscount come from
-     * the selected subcampaign or special case.
-     */
-    $fullSequence = $this->findExactSequence(
-        $targetDiscount,
-        $spinsPerCase,
-        $discountList
-    );
-
-    if ($fullSequence === null) {
-        throw new \Exception(
-            "Cannot create {$spinsPerCase} spin results totaling exactly {$targetDiscount}% from the active Discount List.",
-            400
-        );
-    }
-
-    shuffle($fullSequence);
-
-    return array_slice(
-        $fullSequence,
-        0,
-        $qty
-    );
-}
-    /*
-    |--------------------------------------------------------------------------
-    | Find exact sequence
-    |--------------------------------------------------------------------------
-    |
-    | Repeated discount values are allowed.
-    |
-    */
 
     private function findExactSequence(
         int $target,
@@ -950,6 +726,7 @@ class SpinController extends Controller
         }
 
         $values = $discountList;
+
         shuffle($values);
 
         foreach ($values as $discount) {
@@ -980,12 +757,6 @@ class SpinController extends Controller
 
         return null;
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Safe HTTP status code
-    |--------------------------------------------------------------------------
-    */
 
     private function safeCode($code): int
     {
