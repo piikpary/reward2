@@ -124,35 +124,7 @@
         background: #ffffff;
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
     }
-    .special-reward-list {
-    min-width: 190px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.special-reward-item {
-    padding: 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 11px;
-    background: #fafafa;
-}
-
-.special-reward-item small {
-    display: block;
-    margin-top: 5px;
-}
-
-.special-reward-link {
-    color: #6d28d9;
-    font-size: 11px;
-    font-weight: 800;
-    text-decoration: none;
-}
-
-.special-reward-link:hover {
-    text-decoration: underline;
-}
+ 
 
     .stat-card span {
         display: block;
@@ -323,43 +295,14 @@
         color: #6d28d9;
     }
 
-    .special-spin-used {
-        background: #fef3c7;
-        color: #92400e;
-    }
+    
 
     .special-spin-disabled {
         background: #f1f5f9;
         color: #64748b;
     }
 
-    .special-spin-cell small {
-        display: block;
-        margin-top: 5px;
-        color: #8491a3;
-        font-size: 11px;
-        font-weight: 700;
-    }
-    .special-reward-code {
-    display: inline-block;
-    margin-top: 7px;
-    padding: 6px 9px;
-    border: 1px dashed #8b5cf6;
-    border-radius: 8px;
-    background: #f5f3ff;
-    color: #5b21b6;
-    font-size: 12px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-}
-
-.verification-pending {
-    color: #b45309 !important;
-}
-
-.verification-complete {
-    color: #15803d !important;
-}
+  
 
     .progress-cell {
         min-width: 150px;
@@ -664,19 +607,10 @@
                              *
                              * Do not display the assigned position.
                              */
-                            $specialRewards = $subCampaign
+                           $hasSpecialRewards = $subCampaign
                             ->specialRewards
-                            ->filter(function ($reward) {
-                                return
-                                    $reward->status === 'active'
-                                    || (string) $reward->status === '1'
-                                    || (bool) $reward->is_used;
-                            })
-                            ->sortBy('special_discount')
-                            ->values();
+                            ->isNotEmpty();
 
-                        $hasSpecialRewards =
-                            $specialRewards->isNotEmpty();
                         @endphp
 
                         <tr>
@@ -724,101 +658,26 @@
                                 </span>
                             </td>
 
-                         <td>
-    <div class="special-spin-cell">
-        @if($hasSpecialRewards)
-            <div class="special-reward-list">
-                @foreach($specialRewards as $specialReward)
-                    @php
-                        $specialSpinUsed =
-                            (bool) $specialReward->is_used;
-                    @endphp
-
-                    <div class="special-reward-item">
-                        <span
-                            class="special-spin-badge {{
-                                $specialSpinUsed
-                                    ? 'special-spin-used'
-                                    : 'special-spin-active'
-                            }}"
-                        >
-                            {{
-                                number_format(
-                                    (float) $specialReward
-                                        ->special_discount,
-                                    2
-                                )
-                            }}%
-                        </span>
-
-                        <small>
-                            {{
-                                $specialSpinUsed
-                                    ? 'Winner found'
-                                    : 'Waiting for winner'
-                            }}
-                        </small>
-
-                        <small>
-                            Code:
-                            <strong>
-                                {{
-                                    $specialReward
-                                        ->reward_code
-                                        ?? '-'
-                                }}
-                            </strong>
-                        </small>
-
-                        @if($specialSpinUsed)
-                            <small>
-                                Winner:
-                                {{
-                                    $specialReward
-                                        ->winner
-                                        ? (
-                                            $specialReward
-                                                ->winner
-                                                ->phone_number
-                                            ?? $specialReward
-                                                ->winner
-                                                ->name
-                                            ?? 'Customer'
-                                        )
-                                        : 'Customer'
-                                }}
-                            </small>
-                        @endif
-
-                        <small>
-                            <a
-                                href="{{ route(
-                                    'portal.special-spin-rewards.index',
-                                    [
-                                        'search' =>
-                                            $specialReward
-                                                ->reward_code,
-                                    ]
-                                ) }}"
-                                class="special-reward-link"
-                            >
-                                View record
-                            </a>
-                        </small>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <span
-                class="
-                    special-spin-badge
-                    special-spin-disabled
-                "
-            >
-                Disabled
-            </span>
-        @endif
-    </div>
+                      <td>
+    @if($hasSpecialRewards)
+        <span
+            class="
+                special-spin-badge
+                special-spin-active
+            "
+        >
+            Enabled
+        </span>
+    @else
+        <span
+            class="
+                special-spin-badge
+                special-spin-disabled
+            "
+        >
+            Disabled
+        </span>
+    @endif
 </td>
                             <td>
                                 <span class="number-value">

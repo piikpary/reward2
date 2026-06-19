@@ -22,19 +22,39 @@
      * Main campaign hidden special-spin reward.
      * This is available only when editing an existing campaign.
      */
-    $specialReward = $campaign->exists
-        ? $campaign->mainSpecialReward
-        : null;
+    $unusedMainSpecialRewards = $campaign->exists
+    ? $campaign->mainSpecialRewards
+        ->filter(function ($reward) {
+            return !(bool) $reward->is_used;
+        })
+        ->values()
+    : collect();
 
-    $specialDiscountEnabled = old(
-        'special_discount_enabled',
-        $specialReward
-            && $specialReward->status === 'active'
+$usedMainSpecialRewards = $campaign->exists
+    ? $campaign->mainSpecialRewards
+        ->filter(function ($reward) {
+            return (bool) $reward->is_used;
+        })
+        ->values()
+        : collect();
+
+    $specialDiscountValues = old(
+        'special_discounts',
+        $unusedMainSpecialRewards
+            ->pluck('special_discount')
+            ->toArray()
     );
 
-    $specialDiscountValue = old(
-        'special_discount',
-        $specialReward?->special_discount
+    if (
+        !is_array($specialDiscountValues)
+        || empty($specialDiscountValues)
+    ) {
+        $specialDiscountValues = [''];
+    }
+
+    $specialDiscountEnabled = (bool) old(
+        'special_discount_enabled',
+        $unusedMainSpecialRewards->isNotEmpty()
     );
 
     /*
@@ -219,84 +239,151 @@
     </div>
 
     @if($campaign->exists)
-        <div class="form-group full">
-            <label
-                for="special_discount_enabled"
-                class="checkbox-label"
-            >
-                <input
-                    id="special_discount_enabled"
-                    type="checkbox"
-                    name="special_discount_enabled"
-                    value="1"
-                    @checked($specialDiscountEnabled)
-                    @disabled(!$hasSubCampaigns)
-                >
+    <div
+        id="main-special-spin-box"
+        class="form-group full main-special-spin-box"
+    >
+        <h3 class="main-special-spin-heading">
+            Main Campaign Special Spin Discounts
+        </h3>
 
-                Enable Special Spin Discount
-            </label>
+        <input
+            type="hidden"
+            name="special_discount_enabled"
+            value="0"
+        >
 
-            <small class="help-text">
-                The system will randomly assign this reward to one hidden,
-                unused spin position inside the existing main campaign spin
-                quota. It will not add another spin.
-            </small>
-
-            @if(!$hasSubCampaigns)
-                <small class="error">
-                    Create at least one subcampaign before enabling the
-                    main campaign special spin discount.
-                </small>
-            @endif
-
-            @error('special_discount_enabled')
-                <small class="error">
-                    {{ $message }}
-                </small>
-            @enderror
-        </div>
-
-        <div class="form-group full">
-            <label for="special_discount">
-                Special Spin Discount (%)
-                @if($specialDiscountEnabled)
-                    <span class="required">*</span>
-                @endif
-            </label>
-
+        <label
+            for="special_discount_enabled"
+            class="main-special-checkbox"
+        >
             <input
-                id="special_discount"
-                type="number"
-                name="special_discounts[]"
-                value="{{ $specialDiscountValue }}"
-                min="0.01"
-                step="0.01"
-                placeholder="Example: 100"
+                id="special_discount_enabled"
+                type="checkbox"
+                name="special_discount_enabled"
+                value="1"
+                @checked($specialDiscountEnabled)
                 @disabled(!$hasSubCampaigns)
             >
 
-            <small class="help-text">
-                This discount replaces the normal discount only when the
-                hidden winning spin position is reached. The hidden position
-                is selected automatically and is not displayed.
+            Enable Main Campaign Special Spin Discounts
+        </label>
+
+        <small class="help-text">
+            Each special reward receives its own hidden random
+            position inside one of this campaign's active
+            subcampaigns. These rewards do not increase the total
+            spin quota.
+        </small>
+
+        @if(!$hasSubCampaigns)
+            <small class="error">
+                Create at least one subcampaign before enabling
+                main campaign special spin discounts.
             </small>
+        @endif
 
-            @if(
-                $specialReward
-                && $specialReward->is_used
-            )
-                <small class="help-text">
-                    This special spin reward has already been awarded.
-                </small>
-            @endif
+        @error('special_discount_enabled')
+            <small class="error">
+                {{ $message }}
+            </small>
+        @enderror
 
-            @error('special_discount')
-                <small class="error">
-                    {{ $message }}
-                </small>
-            @enderror
+        <div
+            id="main-special-discount-list"
+            class="main-special-discount-list"
+        >
+            @foreach($specialDiscountValues as $discountValue)
+                <div class="main-special-discount-row">
+                    <div class="main-special-discount-field">
+                        <label>
+                            Special Spin Discount (%)
+                            <span class="required">*</span>
+                        </label>
+
+                        <div class="main-special-input-wrap">
+                            <input
+                                type="number"
+                                name="special_discounts[]"
+                                class="main-special-discount-input"
+                                value="{{ $discountValue }}"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="Example: 1000"
+                                @disabled(!$hasSubCampaigns)
+                            >
+
+                            <span class="main-special-input-suffix">
+                                %
+                            </span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="remove-main-special-btn"
+                        @disabled(!$hasSubCampaigns)
+                    >
+                        Remove
+                    </button>
+                </div>
+            @endforeach
         </div>
-    @endif
+
+        <button
+            type="button"
+            id="add-main-special-discount"
+            class="add-main-special-btn"
+            @disabled(!$hasSubCampaigns)
+        >
+            + Add Special Discount
+        </button>
+
+        <small class="help-text">
+            Each row creates one separate reward, hidden spin
+            position, and unique verification code.
+        </small>
+
+        @error('special_discounts')
+            <small class="error">
+                {{ $message }}
+            </small>
+        @enderror
+
+        @error('special_discounts.*')
+            <small class="error">
+                {{ $message }}
+            </small>
+        @enderror
+
+        @if($usedMainSpecialRewards->isNotEmpty())
+            <div class="main-awarded-rewards">
+                <h4>
+                    Already Awarded Special Rewards
+                </h4>
+
+                @foreach($usedMainSpecialRewards as $usedReward)
+                    <div class="main-awarded-item">
+                        <strong>
+                            {{
+                                number_format(
+                                    (float) $usedReward
+                                        ->special_discount,
+                                    2
+                                )
+                            }}%
+                        </strong>
+
+                        <span>
+                            Code:
+                            {{ $usedReward->reward_code ?? '-' }}
+                        </span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+@endif
 
     <div class="form-group full">
         <label for="description">
@@ -338,3 +425,138 @@
         ✕ Cancel
     </a>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const enabledCheckbox = document.getElementById(
+        'special_discount_enabled'
+    );
+
+    const box = document.getElementById(
+        'main-special-spin-box'
+    );
+
+    const list = document.getElementById(
+        'main-special-discount-list'
+    );
+
+    const addButton = document.getElementById(
+        'add-main-special-discount'
+    );
+
+    if (
+        !enabledCheckbox
+        || !box
+        || !list
+        || !addButton
+    ) {
+        return;
+    }
+
+    const hasSubCampaigns = @json($hasSubCampaigns);
+
+    function createRow() {
+        const row = document.createElement('div');
+
+        row.className = 'main-special-discount-row';
+
+        row.innerHTML = `
+            <div class="main-special-discount-field">
+                <label>
+                    Special Spin Discount (%)
+                    <span class="required">*</span>
+                </label>
+
+                <div class="main-special-input-wrap">
+                    <input
+                        type="number"
+                        name="special_discounts[]"
+                        class="main-special-discount-input"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Example: 1000"
+                    >
+
+                    <span class="main-special-input-suffix">
+                        %
+                    </span>
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="remove-main-special-btn"
+            >
+                Remove
+            </button>
+        `;
+
+        return row;
+    }
+
+    function updateState() {
+        const enabled =
+            hasSubCampaigns
+            && enabledCheckbox.checked;
+
+        box.classList.toggle(
+            'main-special-disabled',
+            !enabled
+        );
+
+        list.querySelectorAll(
+            '.main-special-discount-input'
+        ).forEach(function (input) {
+            input.disabled = !enabled;
+            input.required = enabled;
+        });
+
+        list.querySelectorAll(
+            '.remove-main-special-btn'
+        ).forEach(function (button) {
+            button.disabled = !enabled;
+        });
+
+        addButton.disabled = !enabled;
+    }
+
+    addButton.addEventListener('click', function () {
+        list.appendChild(createRow());
+
+        updateState();
+    });
+
+    list.addEventListener('click', function (event) {
+        if (
+            !event.target.classList.contains(
+                'remove-main-special-btn'
+            )
+        ) {
+            return;
+        }
+
+        const rows = list.querySelectorAll(
+            '.main-special-discount-row'
+        );
+
+        const currentRow = event.target.closest(
+            '.main-special-discount-row'
+        );
+
+        if (rows.length > 1) {
+            currentRow.remove();
+        } else {
+            currentRow.querySelector(
+                '.main-special-discount-input'
+            ).value = '';
+        }
+    });
+
+    enabledCheckbox.addEventListener(
+        'change',
+        updateState
+    );
+
+    updateState();
+});
+</script>

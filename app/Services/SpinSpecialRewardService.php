@@ -611,9 +611,7 @@ class SpinSpecialRewardService
 
         Discount::query()
             ->whereKey($discountId)
-            ->update([
-                'status' => 'inactive',
-            ]);
+            ->delete();
     }
 
     private function generateUniqueRewardCode(): string
