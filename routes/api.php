@@ -9,6 +9,7 @@ use App\Http\Controllers\v2\Setting\SliderController;
 use App\Http\Controllers\v2\Spin\SpinController;
 use App\Http\Controllers\v2\Transfer\TransferController;
 use App\Http\Controllers\v2\Announcement\AnnouncementController;
+use App\Http\Controllers\v2\User\LanguageController;
 
 Route::prefix('auth')->group(function () {
     Route::post('request-otp', [AuthController::class, 'requestOtp'])
@@ -52,4 +53,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     '/announcement',
         [AnnouncementController::class, 'index']
     );
+    Route::patch('/user/language', [
+        LanguageController::class,
+        'update',
+    ]);
 });

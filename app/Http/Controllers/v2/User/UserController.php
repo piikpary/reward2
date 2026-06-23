@@ -49,6 +49,7 @@ class UserController extends Controller
         'status' => is_object($user->status) ? (int) $user->status->value : (int) $user->status,
         'phone_number' => $user->phone_number,
         'user_type' => is_object($user->user_type) ? (int) $user->user_type->value : (int) $user->user_type,
+        'language' => $user->language ?? 'en',
         'passcode' => empty($user->passcode) ? 0 : 1,
         'signature' => $this->generateQrString($name, $phone),
         'wallets' => $walletDetails,

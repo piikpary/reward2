@@ -199,11 +199,25 @@ class TransferController extends Controller
         return;
     }
 
-    $title = 'Transfer Received';
+    $language = $receiver->language ?? 'en';
 
-    $body = $walletType === 'spin'
-        ? "You have received {$amount} spin from {$sender->name}."
-        : "You have received {$amount}% discount from {$sender->name}.";
+    if ($walletType === 'spin') {
+        $title = $language === 'km'
+            ? 'បានទទួល Spin'
+            : 'Transfer Received';
+
+        $body = $language === 'km'
+            ? "អ្នកបានទទួល {$amount} Spin ពី {$sender->name}។"
+            : "You have received {$amount} spin from {$sender->name}.";
+    } else {
+        $title = $language === 'km'
+            ? 'បានទទួលការបញ្ចុះតម្លៃ'
+            : 'Transfer Received';
+
+        $body = $language === 'km'
+            ? "អ្នកបានទទួលការបញ្ចុះតម្លៃ {$amount}% ពី {$sender->name}។"
+            : "You have received {$amount}% discount from {$sender->name}.";
+    }
 
     try {
         sendFcmNotification($receiver->fcm_token, $title, $body, [
@@ -213,6 +227,7 @@ class TransferController extends Controller
             'from_user_id' => $sender->id,
             'from_phone' => $sender->phone_number,
             'to_user_id' => $receiver->id,
+            'language' => $language,
         ]);
     } catch (\Throwable $e) {
         \Log::error('Transfer FCM notification failed', [

@@ -30,6 +30,7 @@ class User extends Authenticatable
         'discount_balance',
         'passcode',
         'signature',
+        'language',
     ];
 
     protected $hidden = [
