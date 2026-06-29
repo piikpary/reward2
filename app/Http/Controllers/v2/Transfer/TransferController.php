@@ -220,6 +220,8 @@ class TransferController extends Controller
     }
 
     try {
+        $receiver->increment('notification_badge_count');
+        $badgeCount = (int) $receiver->fresh()->notification_badge_count;
         sendFcmNotification($receiver->fcm_token, $title, $body, [
             'type' => 'transfer',
             'wallet_type' => $walletType,
@@ -228,6 +230,7 @@ class TransferController extends Controller
             'from_phone' => $sender->phone_number,
             'to_user_id' => $receiver->id,
             'language' => $language,
+            'badge' => $badgeCount,
         ]);
     } catch (\Throwable $e) {
         \Log::error('Transfer FCM notification failed', [
@@ -276,7 +279,7 @@ class TransferController extends Controller
         RateLimiter::clear($key);
 
         return null;
-    }
+    }  
 
     private function safeCode($code): int
     {

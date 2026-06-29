@@ -10,6 +10,7 @@ use App\Http\Controllers\v2\Spin\SpinController;
 use App\Http\Controllers\v2\Transfer\TransferController;
 use App\Http\Controllers\v2\Announcement\AnnouncementController;
 use App\Http\Controllers\v2\User\LanguageController;
+use App\Http\Controllers\v2\User\NotificationController;
 
 Route::prefix('auth')->group(function () {
     Route::post('request-otp', [AuthController::class, 'requestOtp'])
@@ -38,6 +39,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         'user/passcode/verify-reset-otp',
         [PasscodeController::class, 'verifyResetOtp']
     );
+
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
 
     Route::post('user/passcode/reset', [PasscodeController::class, 'reset']);
 

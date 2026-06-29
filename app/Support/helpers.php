@@ -74,6 +74,9 @@ if (!function_exists('sendFcmNotification')) {
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
+        $badgeCount = max(0, (int) ($data['badge'] ?? 1));
+        $data['badge'] = (string) $badgeCount;
+
         $message = [
             'message' => [
                 'token' => $deviceToken,
@@ -84,6 +87,22 @@ if (!function_exists('sendFcmNotification')) {
                 'data' => collect($data)
                     ->map(fn ($value) => (string) $value)
                     ->toArray(),
+
+                'android' => [
+                    'priority' => 'HIGH',
+                    'notification' => [
+                        'notification_count' => $badgeCount,
+                    ],
+                ],
+
+                'apns' => [
+                    'payload' => [
+                        'aps' => [
+                            'badge' => $badgeCount,
+                            'sound' => 'default',
+                        ],
+                    ],
+                ],
             ],
         ];
 
