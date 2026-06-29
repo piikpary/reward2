@@ -224,13 +224,13 @@ class TransferController extends Controller
         $badgeCount = (int) $receiver->fresh()->notification_badge_count;
         sendFcmNotification($receiver->fcm_token, $title, $body, [
             'type' => 'transfer',
-            'wallet_type' => $walletType,
-            'amount' => $amount,
-            'from_user_id' => $sender->id,
-            'from_phone' => $sender->phone_number,
-            'to_user_id' => $receiver->id,
-            'language' => $language,
-            'badge' => $badgeCount,
+            'wallet_type' => (string) $walletType,
+            'amount' => (string) $amount,
+            'from_user_id' => (string) $sender->id,
+            'from_phone' => (string) $sender->phone_number,
+            'to_user_id' => (string) $receiver->id,
+            'language' => (string) $language,
+            'badge' => (string) $badgeCount,
         ]);
     } catch (\Throwable $e) {
         \Log::error('Transfer FCM notification failed', [
