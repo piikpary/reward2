@@ -74,37 +74,46 @@ if (!function_exists('sendFcmNotification')) {
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
-        $badgeCount = max(0, (int) ($data['badge'] ?? 1));
-        $data['badge'] = (string) $badgeCount;
+        $badgeCount = max(0, (int) ($data['badge'] ?? $badgeCount ?? 1));
 
-        $message = [
-            'message' => [
-                'token' => $deviceToken,
-                'notification' => [
-                    'title' => $title,
-                    'body' => $body,
-                ],
-                'data' => collect($data)
+            $payloadData = array_merge(
+                collect($data)
                     ->map(fn ($value) => (string) $value)
                     ->toArray(),
+                [
+                    'badge' => (string) $badgeCount,
+                ]
+            );
 
-                'android' => [
-                    'priority' => 'HIGH',
+            $message = [
+                'message' => [
+                    'token' => $deviceToken,
+
                     'notification' => [
-                        'notification_count' => $badgeCount,
+                        'title' => $title,
+                        'body' => $body,
                     ],
-                ],
 
-                'apns' => [
-                    'payload' => [
-                        'aps' => [
-                            'badge' => $badgeCount,
-                            'sound' => 'default',
+                    // Mobile Flutter app can read: message.data['badge']
+                    'data' => $payloadData,
+
+                    'android' => [
+                        'priority' => 'HIGH',
+                        'notification' => [
+                            'notification_count' => $badgeCount,
+                        ],
+                    ],
+
+                    'apns' => [
+                        'payload' => [
+                            'aps' => [
+                                'badge' => $badgeCount,
+                                'sound' => 'default',
+                            ],
                         ],
                     ],
                 ],
-            ],
-        ];
+            ];
 
         $headers = [
             'Authorization: Bearer ' . $token['access_token'],
