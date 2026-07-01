@@ -76,22 +76,19 @@ if (!function_exists('sendFcmNotification')) {
 
         $badgeCount = max(0, (int) ($data['badge'] ?? 1));
 
-            $payloadData = array_merge(
-                collect($data)
-                    ->map(fn ($value) => (string) $value)
-                    ->toArray(),
-                [
-                    'badge' => (string) $badgeCount,
-                    'title' => (string) $title,
-                    'body' => (string) $body,
-                ]
-            );
+            $payloadData = collect(array_merge($data, [
+                'badge' => (string) $badgeCount,
+                'title' => (string) $title,
+                'body' => (string) $body,
+            ]))
+                ->map(fn ($value) => (string) $value)
+                ->toArray();
 
             $message = [
                 'message' => [
                     'token' => $deviceToken,
 
-                    // Data-only message to prevent duplicate notification
+                    // Data-only message: Android system will NOT auto show notification
                     'data' => $payloadData,
 
                     'android' => [
