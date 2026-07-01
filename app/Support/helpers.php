@@ -79,7 +79,7 @@ if (!function_exists('sendFcmNotification')) {
         $payloadData = collect(array_merge($data, [
             'badge' => (string) $badgeCount,
             'title' => (string) $title,
-            'body' => (string) $body,
+            'body'  => (string) $body,
         ]))
             ->map(fn ($value) => (string) $value)
             ->toArray();
@@ -87,11 +87,15 @@ if (!function_exists('sendFcmNotification')) {
         $message = [
             'message' => [
                 'token' => $deviceToken,
-                
-                // ✅ ONLY data - no notification, no android block
+
+                // Data-only payload to prevent duplicate notification
+                // Mobile app will show notification by itself
                 'data' => $payloadData,
-                
-                // ✅ For iOS badge
+
+                'android' => [
+                    'priority' => 'HIGH',
+                ],
+
                 'apns' => [
                     'payload' => [
                         'aps' => [
