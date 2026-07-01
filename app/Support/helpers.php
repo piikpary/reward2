@@ -74,7 +74,7 @@ if (!function_exists('sendFcmNotification')) {
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
 
-        $badgeCount = max(0, (int) ($data['badge'] ?? $badgeCount ?? 1));
+        $badgeCount = max(0, (int) ($data['badge'] ?? 1));
 
             $payloadData = array_merge(
                 collect($data)
@@ -82,6 +82,8 @@ if (!function_exists('sendFcmNotification')) {
                     ->toArray(),
                 [
                     'badge' => (string) $badgeCount,
+                    'title' => (string) $title,
+                    'body' => (string) $body,
                 ]
             );
 
@@ -89,19 +91,11 @@ if (!function_exists('sendFcmNotification')) {
                 'message' => [
                     'token' => $deviceToken,
 
-                    'notification' => [
-                        'title' => $title,
-                        'body' => $body,
-                    ],
-
-                    // Mobile Flutter app can read: message.data['badge']
+                    // Data-only message to prevent duplicate notification
                     'data' => $payloadData,
 
                     'android' => [
                         'priority' => 'HIGH',
-                        'notification' => [
-                            'notification_count' => $badgeCount,
-                        ],
                     ],
 
                     'apns' => [
