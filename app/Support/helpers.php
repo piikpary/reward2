@@ -76,35 +76,32 @@ if (!function_exists('sendFcmNotification')) {
 
         $badgeCount = max(0, (int) ($data['badge'] ?? 1));
 
-            $payloadData = collect(array_merge($data, [
-                'badge' => (string) $badgeCount,
-                'title' => (string) $title,
-                'body' => (string) $body,
-            ]))
-                ->map(fn ($value) => (string) $value)
-                ->toArray();
+        $payloadData = collect(array_merge($data, [
+            'badge' => (string) $badgeCount,
+            'title' => (string) $title,
+            'body' => (string) $body,
+        ]))
+            ->map(fn ($value) => (string) $value)
+            ->toArray();
 
-            $message = [
-                'message' => [
-                    'token' => $deviceToken,
-
-                    // Data-only message: Android system will NOT auto show notification
-                    'data' => $payloadData,
-
-                    'android' => [
-                        'priority' => 'HIGH',
-                    ],
-
-                    'apns' => [
-                        'payload' => [
-                            'aps' => [
-                                'badge' => $badgeCount,
-                                'sound' => 'default',
-                            ],
+        $message = [
+            'message' => [
+                'token' => $deviceToken,
+                
+                // ✅ ONLY data - no notification, no android block
+                'data' => $payloadData,
+                
+                // ✅ For iOS badge
+                'apns' => [
+                    'payload' => [
+                        'aps' => [
+                            'badge' => $badgeCount,
+                            'sound' => 'default',
                         ],
                     ],
                 ],
-            ];
+            ],
+        ];
 
         $headers = [
             'Authorization: Bearer ' . $token['access_token'],
