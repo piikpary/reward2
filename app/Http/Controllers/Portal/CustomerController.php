@@ -11,6 +11,7 @@ use App\Models\WalletTransaction;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Jobs\ProcessWalletTransactionJob;
 
 class CustomerController extends Controller
 {
@@ -63,7 +64,7 @@ class CustomerController extends Controller
             $userSpinWallet->balance = (float) $userSpinWallet->balance + (int) $validated['qty'];
             $userSpinWallet->save();
 
-            WalletTransaction::create([
+            $walletTransaction = WalletTransaction::create([
                 'user_id' => $user->id,
                 'wallet_id' => $spinWallet->id,
                 'transaction_type' => 'admin_add_spin',
@@ -73,6 +74,8 @@ class CustomerController extends Controller
                 'to_user_id' => $user->id,
                 'description' => $validated['description'] ?? 'Spin added from portal',
             ]);
+
+            ProcessWalletTransactionJob::dispatch($walletTransaction->id)->afterCommit();
         });
 
         return redirect()
@@ -100,7 +103,7 @@ class CustomerController extends Controller
         $userDiscountWallet->balance = (float) $userDiscountWallet->balance + (float) $validated['discount_percentage'];
         $userDiscountWallet->save();
 
-        WalletTransaction::create([
+        $walletTransaction = WalletTransaction::create([
             'user_id' => $user->id,
             'wallet_id' => $discountWallet->id,
             'transaction_type' => 'admin_add_discount',
@@ -110,6 +113,7 @@ class CustomerController extends Controller
             'to_user_id' => $user->id,
             'description' => $validated['description'] ?? 'Discount added from portal',
         ]);
+        ProcessWalletTransactionJob::dispatch($walletTransaction->id)->afterCommit();
     });
 
     return redirect()
