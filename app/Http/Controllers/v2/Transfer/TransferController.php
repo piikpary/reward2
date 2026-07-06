@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use App\Jobs\SendTransferNotificationJob;
 
 class TransferController extends Controller
 {
@@ -185,7 +186,22 @@ class TransferController extends Controller
                 ];
             });
 
-            $this->sendTransferNotification($sender, $receiver, $walletType, $amount);
+            try {
+                    SendTransferNotificationJob::dispatch(
+                        $sender->id,
+                        $receiver->id,
+                        $walletType,
+                        (float) $amount
+                    );
+                } catch (\Throwable $e) {
+                    \Log::error('Transfer notification job dispatch failed', [
+                        'message' => $e->getMessage(),
+                        'sender_id' => $sender->id,
+                        'receiver_id' => $receiver->id,
+                        'wallet_type' => $walletType,
+                        'amount' => $amount,
+                    ]);
+                }
 
             return $this->successResponse($result, $successMessage);
         } catch (\Exception $e) {

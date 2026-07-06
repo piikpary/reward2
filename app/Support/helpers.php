@@ -85,27 +85,34 @@ if (!function_exists('sendFcmNotification')) {
             ->toArray();
 
         $message = [
-            'message' => [
-                'token' => $deviceToken,
+                'message' => [
+                    'token' => $deviceToken,
 
-                // Data-only payload to prevent duplicate notification
-                // Mobile app will show notification by itself
-                'data' => $payloadData,
+                    'notification' => [
+                        'title' => $title,
+                        'body' => $body,
+                    ],
 
-                'android' => [
-                    'priority' => 'HIGH',
-                ],
+                    // Mobile Flutter app can read: message.data['badge']
+                    'data' => $payloadData,
 
-                'apns' => [
-                    'payload' => [
-                        'aps' => [
-                            'badge' => $badgeCount,
-                            'sound' => 'default',
+                    'android' => [
+                        'priority' => 'HIGH',
+                        'notification' => [
+                            'notification_count' => $badgeCount,
+                        ],
+                    ],
+
+                    'apns' => [
+                        'payload' => [
+                            'aps' => [
+                                'badge' => $badgeCount,
+                                'sound' => 'default',
+                            ],
                         ],
                     ],
                 ],
-            ],
-        ];
+            ];
 
         $headers = [
             'Authorization: Bearer ' . $token['access_token'],
