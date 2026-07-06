@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
