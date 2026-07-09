@@ -764,6 +764,20 @@
                                 Special Spin Rewards
                             </span>
                         </a>
+                        <a
+                            href="{{ route('portal.spin-results.index') }}"
+                            class="sidebar-link {{
+                                request()->routeIs('portal.spin-results.*')
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <span class="sidebar-icon">🎯</span>
+
+                            <span class="sidebar-text">
+                                Spin Results
+                            </span>
+                        </a>
                     </li>
 
                 <div class="nav-group">

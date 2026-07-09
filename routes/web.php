@@ -12,6 +12,7 @@ use App\Http\Controllers\Portal\SpinCampaignController;
 use App\Http\Controllers\Portal\SpinSubCampaignController;
 use App\Http\Controllers\Portal\AnnouncementController;
 use App\Http\Controllers\Portal\SpecialSpinRewardController;
+use App\Http\Controllers\Portal\SpinResultController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -255,6 +256,13 @@ Route::middleware('auth')
             '/special-spin-rewards/verify',
             [SpecialSpinRewardController::class, 'verify']
         )->name('special-spin-rewards.verify');
+
+        
+
+        Route::get(
+            '/spin-results',
+            [SpinResultController::class, 'index']
+        )->name('spin-results.index');
 
         
     });

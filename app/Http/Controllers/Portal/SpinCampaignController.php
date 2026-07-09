@@ -156,13 +156,10 @@ class SpinCampaignController extends Controller
         $campaign = SpinCampaign::create($validated);
 
         return redirect()
-            ->route(
-                'portal.spin-campaigns.sub-campaigns.index',
-                $campaign
-            )
+            ->route('portal.spin-campaigns.index')
             ->with(
                 'success',
-                'Main campaign created. Please add its subcampaign rules.'
+                'Main campaign created successfully.'
             );
     }
 
@@ -342,14 +339,11 @@ class SpinCampaignController extends Controller
     }
 
     return redirect()
-        ->route(
-            'portal.spin-campaigns.show',
-            $spinCampaign
-        )
-        ->with(
-            'success',
-            'Main campaign updated successfully.'
-        );
+    ->route('portal.spin-campaigns.index')
+    ->with(
+        'success',
+        'Main campaign updated successfully.'
+    );
 }
 
     public function destroy(SpinCampaign $spinCampaign)
