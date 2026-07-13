@@ -7,6 +7,7 @@ use App\Http\Traits\ApiResponse;
 use App\Models\WalletTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class TransactionController extends Controller
 {
@@ -16,23 +17,56 @@ class TransactionController extends Controller
     {
         $user = $request->user();
 
-        $transactions = WalletTransaction::query()
-            ->with(['fromUser', 'toUser'])
-            ->where('user_id', $user->id)
-            ->latest()
-            ->get()
-            ->map(function ($transaction) {
-                return [
-                    'id' => $transaction->id,
-                    'transaction_type' => $transaction->transaction_type,
-                    'wallet_type' => $transaction->wallet_type,
-                    'amount' => (float) $transaction->amount,
-                    'from' => $transaction->fromUser?->phone_number,
-                    'to' => $transaction->toUser?->phone_number,
-                    'special_reward_code' =>$transaction->special_reward_code,
-                    'created_at' => $transaction->created_at?->format('Y-m-d H:i:s'),
-                ];
-            });
+        $cacheKey =
+            "reward2:api:user:{$user->id}:transactions:v1";
+
+        $transactions = Cache::remember(
+            $cacheKey,
+            now()->addSeconds(15),
+            function () use ($user) {
+                return WalletTransaction::query()
+                    ->with(['fromUser', 'toUser'])
+                    ->where('user_id', $user->id)
+                    ->latest()
+                    ->get()
+                    ->map(function ($transaction) {
+                        return [
+                            'id' =>
+                                $transaction->id,
+
+                            'transaction_type' =>
+                                $transaction->transaction_type,
+
+                            'wallet_type' =>
+                                $transaction->wallet_type,
+
+                            'amount' =>
+                                (float) $transaction->amount,
+
+                            'from' =>
+                                $transaction
+                                    ->fromUser
+                                    ?->phone_number,
+
+                            'to' =>
+                                $transaction
+                                    ->toUser
+                                    ?->phone_number,
+
+                            'special_reward_code' =>
+                                $transaction
+                                    ->special_reward_code,
+
+                            'created_at' =>
+                                $transaction
+                                    ->created_at
+                                    ?->format(
+                                        'Y-m-d H:i:s'
+                                    ),
+                        ];
+                    });
+            }
+        );
 
         return $this->successResponse([
             'total' => $transactions->count(),
