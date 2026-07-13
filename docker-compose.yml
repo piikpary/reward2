@@ -61,8 +61,35 @@ services:
     networks:
       - reward2
 
+  redis:
+    image: redis:7-alpine
+    container_name: reward2-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - reward2
+
 networks:
   reward2:
+    driver: bridge
 
 volumes:
   reward2_mysql:

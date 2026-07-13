@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Traits\ApiResponse;
 use App\Models\Announcement;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class AnnouncementController extends Controller
@@ -14,40 +15,54 @@ class AnnouncementController extends Controller
 
     public function index(): JsonResponse
     {
-        $announcements = Announcement::query()
-            ->with('images')
-            ->where('status', 'active')
-            ->where(
-                'announcement_date',
-                '<=',
-                now()
-            )
-            ->orderByDesc('announcement_date')
-            ->orderByDesc('id')
-            ->get()
-            ->map(function (Announcement $announcement) {
-                return [
-                    'id' => $announcement->id,
+        $announcements = Cache::remember(
+            'reward2:api:announcements:active:v1',
+            now()->addSeconds(60),
+            function () {
+                return Announcement::query()
+                    ->with('images')
+                    ->where('status', 'active')
+                    ->where(
+                        'announcement_date',
+                        '<=',
+                        now()
+                    )
+                    ->orderByDesc('announcement_date')
+                    ->orderByDesc('id')
+                    ->get()
+                    ->map(function (
+                        Announcement $announcement
+                    ) {
+                        return [
+                            'id' => $announcement->id,
 
-                    'title' => $announcement->title,
+                            'title' =>
+                                $announcement->title,
 
-                    'images' => $announcement->images
-                        ->map(function ($image) {
-                            return url(
-                                Storage::disk('public')
-                                    ->url($image->image)
-                            );
-                        })
-                        ->values(),
+                            'images' =>
+                                $announcement->images
+                                    ->map(function ($image) {
+                                        return url(
+                                            Storage::disk('public')
+                                                ->url(
+                                                    $image->image
+                                                )
+                                        );
+                                    })
+                                    ->values(),
 
-                    'content' => $announcement->content,
+                            'content' =>
+                                $announcement->content,
 
-                    'announcement_date' =>
-                        $announcement->announcement_date
-                            ?->toISOString(),
-                ];
-            })
-            ->values();
+                            'announcement_date' =>
+                                $announcement
+                                    ->announcement_date
+                                    ?->toISOString(),
+                        ];
+                    })
+                    ->values();
+            }
+        );
 
         return $this->successResponse(
             $announcements,

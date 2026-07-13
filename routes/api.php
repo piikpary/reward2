@@ -11,6 +11,7 @@ use App\Http\Controllers\v2\Transfer\TransferController;
 use App\Http\Controllers\v2\Announcement\AnnouncementController;
 use App\Http\Controllers\v2\User\LanguageController;
 use App\Http\Controllers\v2\User\NotificationController;
+use App\Http\Controllers\v2\Campaign\CampaignController;
 
 Route::prefix('auth')->group(function () {
     Route::post('request-otp', [AuthController::class, 'requestOtp'])
@@ -21,6 +22,16 @@ Route::prefix('auth')->group(function () {
         ->middleware('throttle:100,1')
         ->name('customer.auth.verify-otp');
 });
+/*
+|--------------------------------------------------------------------------
+| Public campaign API
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    'campaign-list',
+    [CampaignController::class, 'index']
+)->name('campaign.list');
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('user/profile', [UserController::class, 'show']);
@@ -60,4 +71,27 @@ Route::middleware(['auth:sanctum'])->group(function () {
         LanguageController::class,
         'update',
     ]);
+
+     /*
+    |--------------------------------------------------------------------------
+    | Campaign Sharing
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        'verify-share-campaign',
+        [CampaignController::class, 'verifyShare']
+    )->name('campaign.verify-share');
+
+    Route::get(
+        'campaign/{campaign}',
+        [CampaignController::class, 'show']
+    )
+        ->whereNumber('campaign')
+        ->name('campaign.show');
+
+    Route::get(
+        'user-shares',
+        [CampaignController::class, 'userShares']
+    )->name('campaign.user-shares');
 });

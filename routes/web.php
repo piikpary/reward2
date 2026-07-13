@@ -13,6 +13,7 @@ use App\Http\Controllers\Portal\SpinSubCampaignController;
 use App\Http\Controllers\Portal\AnnouncementController;
 use App\Http\Controllers\Portal\SpecialSpinRewardController;
 use App\Http\Controllers\Portal\SpinResultController;
+use App\Http\Controllers\Portal\ShareCampaignController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -218,6 +219,56 @@ Route::middleware('auth')
             'spin-campaigns/{spinCampaign}/reset-progress',
             [SpinCampaignController::class, 'resetProgress']
         )->name('spin-campaigns.reset-progress');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Share Campaigns
+        |--------------------------------------------------------------------------
+        */
+
+        Route::prefix('share-campaigns')
+            ->name('share-campaigns.')
+            ->controller(ShareCampaignController::class)
+            ->group(function () {
+                Route::get('/', 'index')
+                    ->name('index');
+
+                Route::get('/create', 'create')
+                    ->name('create');
+
+                Route::post('/', 'store')
+                    ->name('store');
+
+                Route::get(
+                    '/{shareCampaign}/edit',
+                    'edit'
+                )->name('edit');
+
+                Route::put(
+                    '/{shareCampaign}',
+                    'update'
+                )->name('update');
+
+                Route::patch(
+                    '/{shareCampaign}/toggle-active',
+                    'toggleActive'
+                )->name('toggle-active');
+
+                Route::patch(
+                    '/{shareCampaign}/toggle-publish',
+                    'togglePublish'
+                )->name('toggle-publish');
+
+                Route::get(
+                    '/{shareCampaign}/shares',
+                    'shares'
+                )->name('shares');
+
+                Route::delete(
+                    '/{shareCampaign}',
+                    'destroy'
+                )->name('destroy');
+            });
 
         /*
         |--------------------------------------------------------------------------

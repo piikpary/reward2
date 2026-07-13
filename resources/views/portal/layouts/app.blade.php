@@ -749,6 +749,20 @@
                     <span class="sidebar-icon">📢</span>
                     <span class="sidebar-text">Announcements</span>
                 </a>
+                <a
+                    href="{{ route('portal.share-campaigns.index') }}"
+                    class="sidebar-link {{
+                        request()->routeIs('portal.share-campaigns.*')
+                            ? 'active'
+                            : ''
+                    }}"
+                >
+                    <span class="sidebar-icon">📣</span>
+
+                    <span class="sidebar-text">
+                        Share Campaigns
+                    </span>
+                </a>
                 <li class="sidebar-item">
                         <a
                             href="{{ route('portal.special-spin-rewards.index') }}"
