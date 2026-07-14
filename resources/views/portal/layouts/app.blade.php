@@ -3,11 +3,63 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>Reward Portal</title>
+    <title>Share Campaign | Reward Portal</title>
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
+    >
+
+    <!-- Open Graph Meta Tags -->
+    <meta
+        property="og:title"
+        content="Share Campaign"
+    >
+
+    <meta
+        property="og:description"
+        content="Join this campaign and earn rewards!"
+    >
+
+    <meta
+        property="og:image"
+        content="{{ asset('storage/share-campaigns/default-image.jpg') }}"
+    >
+
+    <meta
+        property="og:url"
+        content="{{ url('/portal/share-campaigns') }}"
+    >
+
+    <meta
+        property="og:type"
+        content="website"
+    >
+
+    <meta
+        property="og:site_name"
+        content="ScanPrize"
+    >
+
+    <!-- Twitter and Telegram Preview -->
+    <meta
+        name="twitter:card"
+        content="summary_large_image"
+    >
+
+    <meta
+        name="twitter:title"
+        content="Share Campaign"
+    >
+
+    <meta
+        name="twitter:description"
+        content="Join this campaign and earn rewards!"
+    >
+
+    <meta
+        name="twitter:image"
+        content="{{ asset('storage/share-campaigns/default-image.jpg') }}"
     >
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
