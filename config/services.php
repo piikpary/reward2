@@ -39,9 +39,8 @@ return [
     'service_account_path' => base_path(env('FCM_SERVICE_ACCOUNT_PATH')),
     ],
     'scanprize' => [
-        'campaign_deep_link' => env(
-            'SCANPRIZE_CAMPAIGN_DEEP_LINK',
-            'https://scanprize.page.link/campaign'
+        'app_deep_link' => env(
+            'SCANPRIZE_APP_DEEP_LINK'
         ),
     ],
 

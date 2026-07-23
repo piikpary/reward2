@@ -115,12 +115,14 @@
             >
         @endif
 
-        <a
-            class="open-app-button"
-            href="{{ $appDeepLink }}"
-        >
-            Open in ScanPrize app
-        </a>
+        @if (!empty($appDeepLink))
+            <a
+                class="open-app-button"
+                href="{{ $appDeepLink }}"
+            >
+                Open in ScanPrize app
+            </a>
+        @endif
     </main>
 </body>
 </html>

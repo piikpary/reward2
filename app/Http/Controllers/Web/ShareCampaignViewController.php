@@ -22,11 +22,17 @@ class ShareCampaignViewController extends Controller
 
             $pageUrl = $shareCampaign->campaignShareUrl();
 
-            $appDeepLink =
-                'https://scanprize.page.link/campaign?'
-                . http_build_query([
-                    'id' => $shareCampaign->id,
-                ]);
+            $deepLinkBase = config(
+                'services.scanprize.app_deep_link'
+            );
+
+            $appDeepLink = $deepLinkBase
+                ? rtrim($deepLinkBase, '?&')
+                    . '?'
+                    . http_build_query([
+                        'id' => $shareCampaign->id,
+                    ])
+                : null;
 
             return response()
                 ->view('share-campaigns.show', [
