@@ -815,6 +815,24 @@
                         Share Campaigns
                     </span>
                 </a>
+                <a
+                    href="{{ route(
+                        'portal.share-campaign-rewards.index'
+                    ) }}"
+                    class="sidebar-link {{
+                        request()->routeIs(
+                            'portal.share-campaign-rewards.*'
+                        )
+                            ? 'active'
+                            : ''
+                    }}"
+                >
+                    <span class="sidebar-icon">🎁</span>
+
+                    <span class="sidebar-text">
+                        Share Rewards
+                    </span>
+                </a>
                 <li class="sidebar-item">
                         <a
                             href="{{ route('portal.special-spin-rewards.index') }}"

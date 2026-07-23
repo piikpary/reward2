@@ -14,6 +14,7 @@ class CampaignShareReward extends Model
         'milestone_threshold',
         'reward_spins',
         'wallet_transaction_id',
+        'granted_by',
         'awarded_at',
     ];
 
@@ -45,6 +46,13 @@ class CampaignShareReward extends Model
         return $this->belongsTo(
             WalletTransaction::class,
             'wallet_transaction_id'
+        );
+    }
+    public function grantedBy(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'granted_by'
         );
     }
 }

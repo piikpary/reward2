@@ -20,14 +20,25 @@
                 </p>
             </div>
 
-            <a
-                class="button button-primary"
-                href="{{ route(
-                    'portal.share-campaigns.create'
-                ) }}"
-            >
-                Create Campaign
-            </a>
+            <div class="actions">
+                    <a
+                        class="button button-secondary"
+                        href="{{ route(
+                            'portal.share-campaign-rewards.index'
+                        ) }}"
+                    >
+                        Share Rewards
+                    </a>
+
+                    <a
+                        class="button button-primary"
+                        href="{{ route(
+                            'portal.share-campaigns.create'
+                        ) }}"
+                    >
+                        Create Campaign
+                    </a>
+                </div>
         </div>
 
         @if (session('success'))

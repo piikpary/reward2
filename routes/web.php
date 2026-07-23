@@ -15,6 +15,7 @@ use App\Http\Controllers\Portal\SpecialSpinRewardController;
 use App\Http\Controllers\Portal\SpinResultController;
 use App\Http\Controllers\Portal\ShareCampaignController;
 use App\Http\Controllers\Web\ShareCampaignViewController;
+use App\Http\Controllers\Portal\ShareCampaignRewardController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -231,6 +232,26 @@ Route::middleware('auth')
         | Share Campaigns
         |--------------------------------------------------------------------------
         */
+        /*
+        |--------------------------------------------------------------------------
+        | Manual Share Campaign Rewards
+        |--------------------------------------------------------------------------
+        */
+
+        Route::prefix('share-campaign-rewards')
+            ->name('share-campaign-rewards.')
+            ->controller(ShareCampaignRewardController::class)
+            ->group(function (): void {
+                Route::get(
+                    '/',
+                    'index'
+                )->name('index');
+
+                Route::post(
+                    '/{progress}/grant',
+                    'grant'
+                )->name('grant');
+            });
 
         Route::prefix('share-campaigns')
             ->name('share-campaigns.')
