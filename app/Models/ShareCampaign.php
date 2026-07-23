@@ -106,31 +106,39 @@ class ShareCampaign extends Model
     }
 
     public function imageUrl(): ?string
-    {
-        if (!$this->image_path) {
-            return null;
-        }
-
-        if (
-            Str::startsWith(
-                $this->image_path,
-                ['http://', 'https://']
-            )
-        ) {
-            return $this->image_path;
-        }
-
-        return Storage::disk('public')->url($this->image_path);
+{
+    if (!$this->image_path) {
+        return null;
     }
 
-    public function campaignShareUrl(): string
-    {
-        if ($this->share_url) {
-            return $this->share_url;
-        }
+    if (
+        Str::startsWith(
+            $this->image_path,
+            ['http://', 'https://']
+        )
+    ) {
+        return $this->image_path;
+    }
 
-        return rtrim(config('app.url'), '/')
-            . '/campaign/'
-            . $this->id;
+    $storageUrl = Storage::disk('public')
+        ->url($this->image_path);
+
+    if (
+        Str::startsWith(
+            $storageUrl,
+            ['http://', 'https://']
+        )
+    ) {
+        return $storageUrl;
+    }
+
+    return url($storageUrl);
+}
+
+   public function campaignShareUrl(): string
+    {
+        return route('share-campaigns.public.show', [
+            'shareCampaign' => $this->id,
+        ]);
     }
 }

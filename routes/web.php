@@ -14,6 +14,7 @@ use App\Http\Controllers\Portal\AnnouncementController;
 use App\Http\Controllers\Portal\SpecialSpinRewardController;
 use App\Http\Controllers\Portal\SpinResultController;
 use App\Http\Controllers\Portal\ShareCampaignController;
+use App\Http\Controllers\Web\ShareCampaignViewController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -36,6 +37,11 @@ Route::middleware('guest')->group(function () {
         [PortalAuthController::class, 'login']
     )->name('portal.login.submit');
 });
+
+Route::get(
+            '/share-campaigns/{shareCampaign}',
+            [ShareCampaignViewController::class, 'show']
+    )->name('share-campaigns.public.show');
 
 /*
 |--------------------------------------------------------------------------
