@@ -21,10 +21,10 @@ class CampaignShareService
     }
 
     /**
-     * Verify and save the user's Facebook share.
+     * Submit a Facebook link for manual review.
      *
-     * This method does not give spins automatically.
-     * Spins must be granted manually from the portal.
+     * This method does not verify the post,
+     * increase campaign progress, or add spins.
      */
     public function verify(
         User $user,
@@ -47,25 +47,21 @@ class CampaignShareService
             $ipAddress,
             $userAgent
         ): array {
-            /*
-             * Lock the campaign to safely update total_shares.
-             */
             $campaign = ShareCampaign::query()
                 ->whereKey($campaign->id)
                 ->lockForUpdate()
                 ->first();
 
-            if (!$campaign || !$campaign->isAvailable()) {
+            if (
+                !$campaign
+                || !$campaign->isAvailable()
+            ) {
                 throw ValidationException::withMessages([
                     'campaign_id' =>
                         'This campaign is no longer available.',
                 ]);
             }
 
-            /*
-             * Prevent the same Facebook post URL
-             * from being submitted more than once.
-             */
             $duplicate = CampaignShare::query()
                 ->where(
                     'facebook_post_url_hash',
@@ -80,51 +76,16 @@ class CampaignShareService
                 ]);
             }
 
-            /*
-             * Create one progress record for each
-             * user and campaign.
-             */
-            CampaignUserProgress::query()
-                ->insertOrIgnore([
-                    'share_campaign_id' =>
-                        $campaign->id,
+            $submittedAt = now();
 
-                    'user_id' =>
-                        $user->id,
-
-                    'current_shares' =>
-                        0,
-
-                    'rewards_earned_count' =>
-                        0,
-
-                    'last_milestone_rewarded' =>
-                        0,
-
-                    'created_at' =>
-                        now(),
-
-                    'updated_at' =>
-                        now(),
-                ]);
+            $reviewDueAt = $submittedAt
+                ->copy()
+                ->addDays(7);
 
             /*
-             * Lock the user's campaign progress.
-             */
-            $progress = CampaignUserProgress::query()
-                ->where(
-                    'share_campaign_id',
-                    $campaign->id
-                )
-                ->where(
-                    'user_id',
-                    $user->id
-                )
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            /*
-             * Save the verified Facebook post.
+             * Save the link as pending.
+             *
+             * Do not create or increment progress here.
              */
             $share = CampaignShare::query()->create([
                 'share_campaign_id' =>
@@ -140,16 +101,25 @@ class CampaignShareService
                     $urlHash,
 
                 'status' =>
-                    'verified',
+                    CampaignShare::STATUS_PENDING,
 
                 'verification_method' =>
-                    'url_format',
+                    'manual_review',
 
                 'shared_at' =>
-                    now(),
+                    $submittedAt,
 
                 'verified_at' =>
-                    now(),
+                    null,
+
+                'reviewed_by' =>
+                    null,
+
+                'reviewed_at' =>
+                    null,
+
+                'rejection_reason' =>
+                    null,
 
                 'ip_address' =>
                     $ipAddress,
@@ -160,46 +130,80 @@ class CampaignShareService
                 'metadata' => [
                     'normalized_url' =>
                         $normalizedUrl,
+
+                    'review_within_days' =>
+                        7,
+
+                    'review_due_at' =>
+                        $reviewDueAt->toISOString(),
                 ],
             ]);
 
             /*
-             * Update user progress.
+             * Read existing approved progress only.
+             * The new pending link does not increase it.
              */
-            $progress->current_shares =
-                (int) $progress->current_shares + 1;
+            $progress =
+                CampaignUserProgress::query()
+                    ->where(
+                        'share_campaign_id',
+                        $campaign->id
+                    )
+                    ->where(
+                        'user_id',
+                        $user->id
+                    )
+                    ->first();
 
-            $progress->last_shared_at =
-                $share->shared_at;
+            $rewardSummary = [
+                'eligible_milestone' => 0,
+                'next_pending_milestone' => null,
+                'pending_milestones' => 0,
+                'granted_milestones' => 0,
+                'eligible_for_reward' => false,
+                'reward_status' => 'not_eligible',
+                'reward_claimed' => false,
+            ];
 
-            $progress->save();
-
-            /*
-             * Update total campaign shares.
-             */
-            $campaign->total_shares =
-                (int) $campaign->total_shares + 1;
-
-            $campaign->save();
-
-            /*
-             * Calculate the manual reward status.
-             * This does not change the user's wallet.
-             */
-            $rewardSummary = $this->rewardSummary(
-                $campaign,
-                $progress
-            );
+            if ($progress) {
+                $rewardSummary =
+                    $this->rewardSummary(
+                        $campaign,
+                        $progress
+                    );
+            }
 
             return [
+                'shareId' =>
+                    $share->id,
+
                 'campaignId' =>
                     $campaign->id,
 
                 'campaignTitle' =>
                     $campaign->title,
 
+                /*
+                 * Submission status is different
+                 * from reward status.
+                 */
+                'submissionStatus' =>
+                    'pending_review',
+
+                'reviewWithinDays' =>
+                    7,
+
+                'reviewDueAt' =>
+                    $reviewDueAt->toISOString(),
+
+                /*
+                 * Count only approved shares.
+                 */
                 'currentShares' =>
-                    (int) $progress->current_shares,
+                    (int) (
+                        $progress
+                            ?->current_shares ?? 0
+                    ),
 
                 'requiredShares' =>
                     (int) $campaign->required_shares,
@@ -214,8 +218,7 @@ class CampaignShareService
                     (int) $campaign->reward_spins,
 
                 /*
-                 * Always false here because only an
-                 * admin can give the spins.
+                 * API submission never awards spins.
                  */
                 'spinAwarded' =>
                     false,
@@ -233,11 +236,6 @@ class CampaignShareService
                         'reward_status'
                     ],
 
-                'eligibleMilestones' =>
-                    $rewardSummary[
-                        'eligible_milestone'
-                    ],
-
                 'pendingMilestones' =>
                     $rewardSummary[
                         'pending_milestones'
@@ -248,41 +246,25 @@ class CampaignShareService
                         'granted_milestones'
                     ],
 
-                'nextPendingMilestone' =>
-                    $rewardSummary[
-                        'next_pending_milestone'
-                    ],
-
-                'pendingSpins' =>
-                    $rewardSummary[
-                        'pending_milestones'
-                    ] * (int) $campaign->reward_spins,
-
                 'rewardClaimed' =>
                     $rewardSummary[
                         'reward_claimed'
                     ],
 
-                /*
-                 * Read the current balance only.
-                 * Do not increase it here.
-                 */
                 'totalSpins' =>
                     $this->currentSpinBalance(
                         $user->id
                     ),
 
                 'sharedAt' =>
-                    $share
-                        ->shared_at
-                        ->toISOString(),
+                    $submittedAt->toISOString(),
             ];
         }, 5);
     }
 
     /**
-     * Calculate reward status for one user
-     * and one campaign.
+     * Calculate reward information using only
+     * manually approved campaign shares.
      */
     public function rewardSummary(
         ShareCampaign $campaign,
@@ -295,20 +277,17 @@ class CampaignShareService
                 (int) $progress->current_shares
             );
 
-        /*
-         * CampaignShareReward records represent
-         * rewards that have already been manually granted.
-         */
-        $rewards ??= CampaignShareReward::query()
-            ->where(
-                'share_campaign_id',
-                $campaign->id
-            )
-            ->where(
-                'user_id',
-                $progress->user_id
-            )
-            ->get();
+        $rewards ??=
+            CampaignShareReward::query()
+                ->where(
+                    'share_campaign_id',
+                    $campaign->id
+                )
+                ->where(
+                    'user_id',
+                    $progress->user_id
+                )
+                ->get();
 
         $grantedMilestoneNumbers = $rewards
             ->pluck('milestone_number')
@@ -320,10 +299,6 @@ class CampaignShareService
             ->sort()
             ->values();
 
-        /*
-         * Find the first eligible milestone that
-         * has not received spins yet.
-         */
         $nextPendingMilestone = null;
 
         for (
@@ -392,10 +367,6 @@ class CampaignShareService
         ];
     }
 
-    /**
-     * Calculate how many reward milestones
-     * the user has reached.
-     */
     public function eligibleMilestone(
         ShareCampaign $campaign,
         int $currentShares
@@ -419,12 +390,6 @@ class CampaignShareService
             : 0;
     }
 
-    /**
-     * Calculate how many more shares are needed.
-     *
-     * Returns zero when a reward is already eligible
-     * but still waiting for admin approval.
-     */
     public function remainingShares(
         ShareCampaign $campaign,
         ?CampaignUserProgress $progress
@@ -453,10 +418,6 @@ class CampaignShareService
                 $currentShares
             );
 
-        /*
-         * The user is eligible, but the admin
-         * has not granted the reward yet.
-         */
         if (
             $eligibleMilestone >
             $lastRewardedMilestone
@@ -464,9 +425,6 @@ class CampaignShareService
             return 0;
         }
 
-        /*
-         * Non-repeatable campaign already finished.
-         */
         if (
             !$campaign->reward_repeatable
             && $lastRewardedMilestone >= 1
@@ -474,18 +432,17 @@ class CampaignShareService
             return 0;
         }
 
-        if (!$campaign->reward_repeatable) {
-            return max(
-                0,
-                $requiredShares - $currentShares
-            );
-        }
-
         $nextMilestone =
-            $lastRewardedMilestone + 1;
+            $campaign->reward_repeatable
+                ? max(
+                    1,
+                    $lastRewardedMilestone + 1
+                )
+                : 1;
 
         $nextThreshold =
-            $nextMilestone * $requiredShares;
+            $nextMilestone
+            * $requiredShares;
 
         return max(
             0,
@@ -493,11 +450,6 @@ class CampaignShareService
         );
     }
 
-    /**
-     * Read the current spin wallet balance.
-     *
-     * This method does not modify the balance.
-     */
     private function currentSpinBalance(
         int $userId
     ): float {

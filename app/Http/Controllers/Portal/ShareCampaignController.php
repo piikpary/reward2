@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
+use App\Models\CampaignShare;
+use App\Models\CampaignUserProgress;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
 
 class ShareCampaignController extends Controller
 {
@@ -308,55 +313,325 @@ class ShareCampaignController extends Controller
      * Display customers who shared this campaign.
      */
     public function shares(
-        ShareCampaign $shareCampaign
-    ): View {
-        $shares = $shareCampaign
-            ->shares()
-            ->with('user')
-            ->orderByDesc('shared_at')
-            ->paginate(25);
+    ShareCampaign $shareCampaign
+): View {
+    $shares = $shareCampaign
+        ->shares()
+        ->with([
+            'user',
+            'reviewedBy',
+        ])
+        ->orderByDesc('shared_at')
+        ->paginate(25);
 
-        $statistics = [
-            'total_shares' =>
-                $shareCampaign
-                    ->shares()
-                    ->count(),
+    $statistics = [
+        'total_shares' =>
+            $shareCampaign
+                ->shares()
+                ->count(),
 
-            'verified_shares' =>
-                $shareCampaign
-                    ->shares()
-                    ->where(
-                        'status',
-                        'verified'
+        'pending_shares' =>
+            $shareCampaign
+                ->shares()
+                ->where(
+                    'status',
+                    CampaignShare::STATUS_PENDING
+                )
+                ->count(),
+
+        'verified_shares' =>
+            $shareCampaign
+                ->shares()
+                ->where(
+                    'status',
+                    CampaignShare::STATUS_VERIFIED
+                )
+                ->count(),
+
+        'rejected_shares' =>
+            $shareCampaign
+                ->shares()
+                ->where(
+                    'status',
+                    CampaignShare::STATUS_REJECTED
+                )
+                ->count(),
+
+        'unique_customers' =>
+            $shareCampaign
+                ->shares()
+                ->distinct()
+                ->count('user_id'),
+
+        'rewards_awarded' =>
+            $shareCampaign
+                ->rewards()
+                ->count(),
+
+        'spins_awarded' =>
+            (int) $shareCampaign
+                ->rewards()
+                ->sum('reward_spins'),
+    ];
+
+    return view(
+        'portal.share-campaigns.shares',
+        compact(
+            'shareCampaign',
+            'shares',
+            'statistics'
+        )
+    );
+}
+/**
+ * Approve one submitted Facebook post.
+ *
+ * This is where verified campaign progress increases.
+ */
+public function approveShare(
+    Request $request,
+    ShareCampaign $shareCampaign,
+    CampaignShare $share
+): RedirectResponse {
+    try {
+        $result = DB::transaction(
+            function () use (
+                $request,
+                $shareCampaign,
+                $share
+            ): array {
+                $campaign =
+                    ShareCampaign::query()
+                        ->whereKey(
+                            $shareCampaign->id
+                        )
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                $share =
+                    CampaignShare::query()
+                        ->whereKey($share->id)
+                        ->where(
+                            'share_campaign_id',
+                            $campaign->id
+                        )
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                if (
+                    $share->status !==
+                    CampaignShare::STATUS_PENDING
+                ) {
+                    throw ValidationException
+                        ::withMessages([
+                            'share' =>
+                                'This share has already been reviewed.',
+                        ]);
+                }
+
+                CampaignUserProgress::query()
+                    ->insertOrIgnore([
+                        'share_campaign_id' =>
+                            $campaign->id,
+
+                        'user_id' =>
+                            $share->user_id,
+
+                        'current_shares' =>
+                            0,
+
+                        'rewards_earned_count' =>
+                            0,
+
+                        'last_milestone_rewarded' =>
+                            0,
+
+                        'created_at' =>
+                            now(),
+
+                        'updated_at' =>
+                            now(),
+                    ]);
+
+                $progress =
+                    CampaignUserProgress::query()
+                        ->where(
+                            'share_campaign_id',
+                            $campaign->id
+                        )
+                        ->where(
+                            'user_id',
+                            $share->user_id
+                        )
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                $share->update([
+                    'status' =>
+                        CampaignShare::STATUS_VERIFIED,
+
+                    'verification_method' =>
+                        'manual_review',
+
+                    'verified_at' =>
+                        now(),
+
+                    'reviewed_by' =>
+                        $request->user()->id,
+
+                    'reviewed_at' =>
+                        now(),
+
+                    'rejection_reason' =>
+                        null,
+                ]);
+
+                $progress->current_shares =
+                    (int) $progress->current_shares + 1;
+
+                if (
+                    !$progress->last_shared_at
+                    || $share->shared_at->gt(
+                        $progress->last_shared_at
                     )
-                    ->count(),
+                ) {
+                    $progress->last_shared_at =
+                        $share->shared_at;
+                }
 
-            'unique_customers' =>
-                $shareCampaign
-                    ->shares()
-                    ->distinct()
-                    ->count('user_id'),
+                $progress->save();
 
-            'rewards_awarded' =>
-                $shareCampaign
-                    ->rewards()
-                    ->count(),
+                $campaign->total_shares =
+                    (int) $campaign->total_shares + 1;
 
-            'spins_awarded' =>
-                (int) $shareCampaign
-                    ->rewards()
-                    ->sum('reward_spins'),
-        ];
+                $campaign->save();
 
-        return view(
-            'portal.share-campaigns.shares',
-            compact(
-                'shareCampaign',
-                'shares',
-                'statistics'
-            )
+                return [
+                    'current_shares' =>
+                        (int) $progress->current_shares,
+
+                    'required_shares' =>
+                        (int) $campaign->required_shares,
+                ];
+            },
+            5
+        );
+
+        return back()->with(
+            'success',
+            "Share approved successfully. Verified progress: {$result['current_shares']} / {$result['required_shares']}."
+        );
+    } catch (ValidationException $exception) {
+        return back()->withErrors(
+            $exception->errors()
+        );
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return back()->with(
+            'error',
+            'Unable to approve this campaign share.'
         );
     }
+}
+
+/**
+ * Reject one submitted Facebook post.
+ *
+ * Rejected posts never increase progress.
+ */
+public function rejectShare(
+    Request $request,
+    ShareCampaign $shareCampaign,
+    CampaignShare $share
+): RedirectResponse {
+    $validated = $request->validate([
+        'rejection_reason' => [
+            'nullable',
+            'string',
+            'max:500',
+        ],
+    ]);
+
+    try {
+        DB::transaction(function () use (
+            $request,
+            $shareCampaign,
+            $share,
+            $validated
+        ): void {
+            $share =
+                CampaignShare::query()
+                    ->whereKey($share->id)
+                    ->where(
+                        'share_campaign_id',
+                        $shareCampaign->id
+                    )
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+            if (
+                $share->status !==
+                CampaignShare::STATUS_PENDING
+            ) {
+                throw ValidationException
+                    ::withMessages([
+                        'share' =>
+                            'This share has already been reviewed.',
+                    ]);
+            }
+
+            $reason = trim(
+                (string) (
+                    $validated[
+                        'rejection_reason'
+                    ] ?? ''
+                )
+            );
+
+            if ($reason === '') {
+                $reason =
+                    'The post is not public or does not match the campaign.';
+            }
+
+            $share->update([
+                'status' =>
+                    CampaignShare::STATUS_REJECTED,
+
+                'verification_method' =>
+                    'manual_review',
+
+                'verified_at' =>
+                    null,
+
+                'reviewed_by' =>
+                    $request->user()->id,
+
+                'reviewed_at' =>
+                    now(),
+
+                'rejection_reason' =>
+                    $reason,
+            ]);
+        }, 5);
+
+        return back()->with(
+            'success',
+            'Share rejected successfully.'
+        );
+    } catch (ValidationException $exception) {
+        return back()->withErrors(
+            $exception->errors()
+        );
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return back()->with(
+            'error',
+            'Unable to reject this campaign share.'
+        );
+    }
+}
 
     /**
      * Soft delete campaign.

@@ -295,6 +295,20 @@ Route::middleware('auth')
                     '/{shareCampaign}',
                     'destroy'
                 )->name('destroy');
+                Route::get(
+                    '/{shareCampaign}/shares',
+                    'shares'
+                )->name('shares');
+
+                Route::patch(
+                    '/{shareCampaign}/shares/{share}/approve',
+                    'approveShare'
+                )->name('shares.approve');
+
+                Route::patch(
+                    '/{shareCampaign}/shares/{share}/reject',
+                    'rejectShare'
+                )->name('shares.reject');
             });
 
         /*

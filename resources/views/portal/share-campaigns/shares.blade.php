@@ -50,12 +50,15 @@
             border: 1px solid #eeeeee;
             border-radius: 22px;
             background: #ffffff;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            box-shadow:
+                0 10px 30px
+                rgba(0, 0, 0, 0.05);
         }
 
         .campaign-summary-grid {
             display: grid;
-            grid-template-columns: 220px minmax(0, 1fr);
+            grid-template-columns:
+                220px minmax(0, 1fr);
             gap: 28px;
             align-items: start;
         }
@@ -67,10 +70,10 @@
         .campaign-poster-box .poster-large {
             width: 100%;
             height: 170px;
-            border-radius: 18px;
-            object-fit: cover;
             border: 1px solid #e5e7eb;
+            border-radius: 18px;
             background: #f7f8fa;
+            object-fit: cover;
         }
 
         .campaign-summary-content {
@@ -97,7 +100,8 @@
 
         .campaign-meta-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
             gap: 14px;
         }
 
@@ -133,7 +137,8 @@
         .statistics.statistics-report {
             margin-bottom: 22px;
             display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns:
+                repeat(7, minmax(0, 1fr));
             gap: 14px;
         }
 
@@ -142,7 +147,9 @@
             border: 1px solid #eeeeee;
             border-radius: 18px;
             background: #ffffff;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+            box-shadow:
+                0 8px 24px
+                rgba(0, 0, 0, 0.04);
         }
 
         .statistics-report .stat-label {
@@ -156,7 +163,7 @@
         .statistics-report .stat-value {
             margin-top: 10px;
             color: #0f172a;
-            font-size: 42px;
+            font-size: 36px;
             font-weight: 800;
             line-height: 1;
             letter-spacing: -0.04em;
@@ -199,7 +206,7 @@
         }
 
         .campaign-table.report-table {
-            min-width: 1200px;
+            min-width: 1450px;
         }
 
         .campaign-table.report-table th {
@@ -209,6 +216,7 @@
         .campaign-table.report-table td {
             padding-top: 16px;
             padding-bottom: 16px;
+            vertical-align: top;
         }
 
         .table-cell-main {
@@ -246,13 +254,44 @@
             font-size: 16px;
         }
 
+        .review-actions {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .review-actions form {
+            margin: 0;
+        }
+
+        .review-reason {
+            margin-top: 6px;
+            padding: 8px 10px;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            background: #fef2f2;
+            color: #991b1b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 1450px) {
+            .statistics.statistics-report {
+                grid-template-columns:
+                    repeat(4, minmax(0, 1fr));
+            }
+        }
+
         @media (max-width: 1200px) {
             .campaign-meta-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
             }
 
             .statistics.statistics-report {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -306,27 +345,70 @@
                 </h1>
 
                 <p class="report-subtitle">
-                    Review customer campaign sharing activity, verification status, and awarded rewards.
+                    Review submitted Facebook posts,
+                    approve valid public campaign posts,
+                    or reject invalid submissions.
                 </p>
             </div>
 
             <div class="report-actions">
                 <a
                     class="button button-secondary"
-                    href="{{ route('portal.share-campaigns.index') }}"
+                    href="{{ route(
+                        'portal.share-campaigns.index'
+                    ) }}"
                 >
                     Campaign List
                 </a>
 
                 <a
                     class="button button-primary"
-                    href="{{ route('portal.share-campaigns.edit', $shareCampaign) }}"
+                    href="{{ route(
+                        'portal.share-campaigns.edit',
+                        $shareCampaign
+                    ) }}"
                 >
                     Edit Campaign
                 </a>
             </div>
         </div>
 
+        {{-- Success message --}}
+        @if (session('success'))
+            <div class="success">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        {{-- General error --}}
+        @if (session('error'))
+            <div class="campaign-card">
+                <div class="error">
+                    {{ session('error') }}
+                </div>
+            </div>
+        @endif
+
+        {{-- Validation errors --}}
+        @if ($errors->any())
+            <div class="campaign-card">
+                <div class="error">
+                    <strong>
+                        Please correct the following errors:
+                    </strong>
+
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>
+                                {{ $error }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+
+        {{-- Campaign information --}}
         <div class="campaign-summary-card">
             <div class="campaign-summary-grid">
                 <div class="campaign-poster-box">
@@ -348,7 +430,10 @@
                         </h2>
 
                         <p>
-                            {{ $shareCampaign->description ?: 'No campaign description provided.' }}
+                            {{
+                                $shareCampaign->description
+                                ?: 'No campaign description provided.'
+                            }}
                         </p>
                     </div>
 
@@ -359,7 +444,12 @@
                             </div>
 
                             <div class="campaign-meta-value">
-                                {{ number_format($shareCampaign->required_shares) }}
+                                {{
+                                    number_format(
+                                        $shareCampaign
+                                            ->required_shares
+                                    )
+                                }}
                             </div>
                         </div>
 
@@ -369,7 +459,12 @@
                             </div>
 
                             <div class="campaign-meta-value">
-                                {{ number_format($shareCampaign->reward_spins) }}
+                                {{
+                                    number_format(
+                                        $shareCampaign
+                                            ->reward_spins
+                                    )
+                                }}
                             </div>
                         </div>
 
@@ -378,8 +473,18 @@
                                 Start date
                             </div>
 
-                            <div class="campaign-meta-value" style="font-size: 16px;">
-                                {{ $shareCampaign->starts_at?->format('d M Y H:i') ?? 'Immediately' }}
+                            <div
+                                class="campaign-meta-value"
+                                style="font-size: 16px;"
+                            >
+                                {{
+                                    $shareCampaign
+                                        ->starts_at
+                                        ?->format(
+                                            'd M Y H:i'
+                                        )
+                                    ?? 'Immediately'
+                                }}
                             </div>
                         </div>
 
@@ -388,8 +493,18 @@
                                 Expiry date
                             </div>
 
-                            <div class="campaign-meta-value" style="font-size: 16px;">
-                                {{ $shareCampaign->expires_at?->format('d M Y H:i') ?? 'No expiry' }}
+                            <div
+                                class="campaign-meta-value"
+                                style="font-size: 16px;"
+                            >
+                                {{
+                                    $shareCampaign
+                                        ->expires_at
+                                        ?->format(
+                                            'd M Y H:i'
+                                        )
+                                    ?? 'No expiry'
+                                }}
                             </div>
                         </div>
                     </div>
@@ -417,11 +532,20 @@
 
                         @if ($shareCampaign->reward_repeatable)
                             <span class="badge badge-warning">
-                                Repeatable reward
+                                Repeatable Reward
+                            </span>
+                        @else
+                            <span class="badge badge-gray">
+                                One-time Reward
                             </span>
                         @endif
 
-                        @if ($shareCampaign->expires_at && $shareCampaign->expires_at->isPast())
+                        @if (
+                            $shareCampaign->expires_at
+                            && $shareCampaign
+                                ->expires_at
+                                ->isPast()
+                        )
                             <span class="badge badge-danger">
                                 Expired
                             </span>
@@ -431,32 +555,77 @@
             </div>
         </div>
 
+        {{-- Statistics --}}
         <div class="statistics statistics-report">
             <div class="stat">
                 <div class="stat-label">
-                    Total shares
+                    Total submissions
                 </div>
 
                 <div class="stat-value">
-                    {{ number_format($statistics['total_shares']) }}
+                    {{
+                        number_format(
+                            $statistics['total_shares']
+                        )
+                    }}
                 </div>
 
                 <div class="stat-note">
-                    All customer share submissions for this campaign.
+                    All Facebook links submitted for review.
                 </div>
             </div>
 
             <div class="stat">
                 <div class="stat-label">
-                    Verified shares
+                    Pending review
                 </div>
 
                 <div class="stat-value">
-                    {{ number_format($statistics['verified_shares']) }}
+                    {{
+                        number_format(
+                            $statistics['pending_shares']
+                        )
+                    }}
                 </div>
 
                 <div class="stat-note">
-                    Shares successfully verified by the system.
+                    Submissions waiting for admin review.
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-label">
+                    Approved shares
+                </div>
+
+                <div class="stat-value">
+                    {{
+                        number_format(
+                            $statistics['verified_shares']
+                        )
+                    }}
+                </div>
+
+                <div class="stat-note">
+                    Public campaign posts approved by admin.
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-label">
+                    Rejected shares
+                </div>
+
+                <div class="stat-value">
+                    {{
+                        number_format(
+                            $statistics['rejected_shares']
+                        )
+                    }}
+                </div>
+
+                <div class="stat-note">
+                    Invalid, private, or unrelated posts.
                 </div>
             </div>
 
@@ -466,51 +635,66 @@
                 </div>
 
                 <div class="stat-value">
-                    {{ number_format($statistics['unique_customers']) }}
+                    {{
+                        number_format(
+                            $statistics['unique_customers']
+                        )
+                    }}
                 </div>
 
                 <div class="stat-note">
-                    Number of customers participating in this campaign.
+                    Customers participating in this campaign.
                 </div>
             </div>
 
             <div class="stat">
                 <div class="stat-label">
-                    Rewards awarded
+                    Rewards granted
                 </div>
 
                 <div class="stat-value">
-                    {{ number_format($statistics['rewards_awarded']) }}
+                    {{
+                        number_format(
+                            $statistics['rewards_awarded']
+                        )
+                    }}
                 </div>
 
                 <div class="stat-note">
-                    Total reward-award records created from this campaign.
+                    Rewards manually granted by admins.
                 </div>
             </div>
 
             <div class="stat">
                 <div class="stat-label">
-                    Spins awarded
+                    Spins granted
                 </div>
 
                 <div class="stat-value">
-                    {{ number_format($statistics['spins_awarded']) }}
+                    {{
+                        number_format(
+                            $statistics['spins_awarded']
+                        )
+                    }}
                 </div>
 
                 <div class="stat-note">
-                    Total spin quantity distributed to customers.
+                    Total spins added to user accounts.
                 </div>
             </div>
         </div>
 
+        {{-- Share review table --}}
         <div class="campaign-card report-table-card">
             <div class="report-table-header">
                 <h2 class="report-table-title">
-                    Shared Customer List
+                    Customer Share Submissions
                 </h2>
 
                 <p class="report-table-subtitle">
-                    Detailed record of Facebook post submissions, customer information, verification result, and IP address.
+                    Review submitted Facebook posts,
+                    approve valid public campaign posts,
+                    or reject invalid submissions.
                 </p>
             </div>
 
@@ -520,12 +704,13 @@
                         <tr>
                             <th>#</th>
                             <th>Customer</th>
-                            <th>Contact</th>
-                            <th>Facebook post</th>
-                            <th>Status</th>
-                            <th>Verification</th>
-                            <th>Shared at</th>
-                            <th>IP address</th>
+                            <th>Phone</th>
+                            <th>Facebook Post</th>
+                            <th>Submitted At</th>
+                            <th>Review Status</th>
+                            <th>Reviewed Information</th>
+                            <th>IP Address</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
 
@@ -534,13 +719,11 @@
                             @php
                                 $customerName =
                                     $share->user?->name
-                                    ?? $share->user?->username
-                                    ?? $share->user?->phone
+                                    ?? $share->user?->phone_number
                                     ?? 'Customer #' . $share->user_id;
 
-                                $customerContact =
-                                    $share->user?->phone
-                                    ?? $share->user?->email
+                                $customerPhone =
+                                    $share->user?->phone_number
                                     ?? 'N/A';
                             @endphp
 
@@ -548,7 +731,8 @@
                                 <td>
                                     <div class="table-cell-main">
                                         {{
-                                            ($shares->currentPage() - 1) * $shares->perPage()
+                                            ($shares->currentPage() - 1)
+                                            * $shares->perPage()
                                             + $loop->iteration
                                         }}
                                     </div>
@@ -560,39 +744,165 @@
                                     </div>
 
                                     <div class="table-cell-sub">
-                                        User ID: {{ $share->user_id }}
+                                        User ID:
+                                        {{ $share->user_id }}
                                     </div>
                                 </td>
 
                                 <td>
                                     <div class="table-cell-main">
-                                        {{ $customerContact }}
+                                        {{ $customerPhone }}
                                     </div>
                                 </td>
 
                                 <td>
                                     <a
                                         class="facebook-link"
-                                        href="{{ $share->facebook_post_url }}"
+                                        href="{{
+                                            $share
+                                                ->facebook_post_url
+                                        }}"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
-                                        Open Facebook post
+                                        Open Facebook Post
                                     </a>
 
                                     <div class="table-cell-sub">
-                                        {{ \Illuminate\Support\Str::limit($share->facebook_post_url, 60) }}
+                                        {{
+                                            \Illuminate\Support\Str
+                                                ::limit(
+                                                    $share
+                                                        ->facebook_post_url,
+                                                    60
+                                                )
+                                        }}
                                     </div>
                                 </td>
 
                                 <td>
-                                    @if ($share->status === 'verified')
-                                        <span class="badge badge-success">
-                                            Verified
+                                    <div class="table-cell-main">
+                                        {{
+                                            $share
+                                                ->shared_at
+                                                ?->format(
+                                                    'd M Y H:i:s'
+                                                )
+                                            ?? '-'
+                                        }}
+                                    </div>
+                                </td>
+
+                                <td>
+                                    @if (
+                                        $share->status ===
+                                        \App\Models\CampaignShare
+                                            ::STATUS_PENDING
+                                    )
+                                        <span
+                                            class="
+                                                badge
+                                                badge-warning
+                                            "
+                                        >
+                                            Pending Review
+                                        </span>
+                                    @elseif (
+                                        $share->status ===
+                                        \App\Models\CampaignShare
+                                            ::STATUS_VERIFIED
+                                    )
+                                        <span
+                                            class="
+                                                badge
+                                                badge-success
+                                            "
+                                        >
+                                            Approved
+                                        </span>
+                                    @elseif (
+                                        $share->status ===
+                                        \App\Models\CampaignShare
+                                            ::STATUS_REJECTED
+                                    )
+                                        <span
+                                            class="
+                                                badge
+                                                badge-danger
+                                            "
+                                        >
+                                            Rejected
                                         </span>
                                     @else
-                                        <span class="badge badge-warning">
-                                            {{ ucfirst($share->status) }}
+                                        <span
+                                            class="
+                                                badge
+                                                badge-gray
+                                            "
+                                        >
+                                            {{
+                                                ucfirst(
+                                                    $share->status
+                                                )
+                                            }}
+                                        </span>
+                                    @endif
+
+                                    <div class="table-cell-sub">
+                                        Method:
+                                        {{
+                                            str_replace(
+                                                '_',
+                                                ' ',
+                                                ucfirst(
+                                                    $share
+                                                        ->verification_method
+                                                )
+                                            )
+                                        }}
+                                    </div>
+                                </td>
+
+                                <td>
+                                    @if ($share->reviewed_at)
+                                        <div class="table-cell-main">
+                                            {{
+                                                $share
+                                                    ->reviewed_at
+                                                    ->format(
+                                                        'd M Y H:i'
+                                                    )
+                                            }}
+                                        </div>
+
+                                        <div class="table-cell-sub">
+                                            Reviewed by:
+                                            {{
+                                                $share
+                                                    ->reviewedBy
+                                                    ?->name
+                                                ?? 'Unknown admin'
+                                            }}
+                                        </div>
+
+                                        @if (
+                                            $share
+                                                ->rejection_reason
+                                        )
+                                            <div class="review-reason">
+                                                <strong>
+                                                    Reason:
+                                                </strong>
+
+                                                {{
+                                                    $share
+                                                        ->rejection_reason
+                                                }}
+                                            </div>
+                                        @endif
+                                    @else
+                                        <span class="muted">
+                                            Not reviewed yet
                                         </span>
                                     @endif
                                 </td>
@@ -600,32 +910,136 @@
                                 <td>
                                     <div class="table-cell-main">
                                         {{
-                                            str_replace(
-                                                '_',
-                                                ' ',
-                                                ucfirst($share->verification_method)
-                                            )
+                                            $share->ip_address
+                                            ?? 'N/A'
                                         }}
                                     </div>
                                 </td>
 
                                 <td>
-                                    <div class="table-cell-main">
-                                        {{ $share->shared_at?->format('d M Y H:i:s') }}
-                                    </div>
-                                </td>
+                                    @if (
+                                        $share->status ===
+                                        \App\Models\CampaignShare
+                                            ::STATUS_PENDING
+                                    )
+                                        <div class="review-actions">
+                                            <form
+                                                method="POST"
+                                                action="{{ route(
+                                                    'portal.share-campaigns.shares.approve',
+                                                    [
+                                                        'shareCampaign' =>
+                                                            $shareCampaign,
 
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{ $share->ip_address ?? 'N/A' }}
-                                    </div>
+                                                        'share' =>
+                                                            $share,
+                                                    ]
+                                                ) }}"
+                                                onsubmit="
+                                                    return confirm(
+                                                        'Approve this Facebook post?'
+                                                    );
+                                                "
+                                            >
+                                                @csrf
+                                                @method('PATCH')
+
+                                                <button
+                                                    class="
+                                                        button
+                                                        button-small
+                                                        button-success
+                                                    "
+                                                    type="submit"
+                                                >
+                                                    Approve
+                                                </button>
+                                            </form>
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route(
+                                                    'portal.share-campaigns.shares.reject',
+                                                    [
+                                                        'shareCampaign' =>
+                                                            $shareCampaign,
+
+                                                        'share' =>
+                                                            $share,
+                                                    ]
+                                                ) }}"
+                                                onsubmit="
+                                                    return confirm(
+                                                        'Reject this Facebook post?'
+                                                    );
+                                                "
+                                            >
+                                                @csrf
+                                                @method('PATCH')
+
+                                                <input
+                                                    type="hidden"
+                                                    name="rejection_reason"
+                                                    value="The post is not public or does not match the campaign."
+                                                >
+
+                                                <button
+                                                    class="
+                                                        button
+                                                        button-small
+                                                        button-danger
+                                                    "
+                                                    type="submit"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @elseif (
+                                        $share->status ===
+                                        \App\Models\CampaignShare
+                                            ::STATUS_VERIFIED
+                                    )
+                                        <button
+                                            class="
+                                                button
+                                                button-small
+                                                button-secondary
+                                            "
+                                            type="button"
+                                            disabled
+                                        >
+                                            Approved
+                                        </button>
+                                    @else
+                                        <button
+                                            class="
+                                                button
+                                                button-small
+                                                button-secondary
+                                            "
+                                            type="button"
+                                            disabled
+                                        >
+                                            Rejected
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="empty-report">
-                                    <strong>No customer shares yet</strong>
-                                    Customer Facebook share submissions will appear here after the API verification request is completed.
+                                <td
+                                    colspan="9"
+                                    class="empty-report"
+                                >
+                                    <strong>
+                                        No customer share
+                                        submissions yet
+                                    </strong>
+
+                                    Submitted Facebook post links
+                                    will appear here for manual
+                                    review.
                                 </td>
                             </tr>
                         @endforelse
@@ -633,8 +1047,12 @@
                 </table>
             </div>
 
+            {{-- Pagination --}}
             @if ($shares->hasPages())
-                <div class="pagination-area" style="padding: 0 24px 24px;">
+                <div
+                    class="pagination-area"
+                    style="padding: 0 24px 24px;"
+                >
                     <div class="muted">
                         Showing
                         {{ $shares->firstItem() }}
@@ -648,8 +1066,14 @@
                     <div class="actions">
                         @if ($shares->previousPageUrl())
                             <a
-                                class="button button-secondary"
-                                href="{{ $shares->previousPageUrl() }}"
+                                class="
+                                    button
+                                    button-secondary
+                                "
+                                href="{{
+                                    $shares
+                                        ->previousPageUrl()
+                                }}"
                             >
                                 Previous
                             </a>
@@ -657,8 +1081,14 @@
 
                         @if ($shares->nextPageUrl())
                             <a
-                                class="button button-secondary"
-                                href="{{ $shares->nextPageUrl() }}"
+                                class="
+                                    button
+                                    button-secondary
+                                "
+                                href="{{
+                                    $shares
+                                        ->nextPageUrl()
+                                }}"
                             >
                                 Next
                             </a>

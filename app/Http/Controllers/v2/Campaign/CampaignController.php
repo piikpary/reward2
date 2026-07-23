@@ -80,46 +80,56 @@ class CampaignController extends Controller
      * Validate and record the user's Facebook campaign share.
      */
     public function verifyShare(
-        VerifyCampaignShareRequest $request
-    ): JsonResponse {
-        $campaign = ShareCampaign::query()
-            ->findOrFail(
-                $request->integer('campaign_id')
-            );
+    VerifyCampaignShareRequest $request
+): JsonResponse {
+    $campaign = ShareCampaign::query()
+        ->findOrFail(
+            $request->integer('campaign_id')
+        );
 
-        try {
-            $result = $this->campaignShareService->verify(
-                user: $request->user(),
-                campaign: $campaign,
-                facebookPostUrl: $request
-                    ->string('facebook_post_url')
-                    ->toString(),
-                ipAddress: $request->ip(),
-                userAgent: $request->userAgent()
-            );
+    try {
+        $result =
+            $this->campaignShareService
+                ->verify(
+                    user: $request->user(),
 
-            return response()->json([
-                'success' => true,
+                    campaign: $campaign,
 
-                'message' => $result['spinAwarded']
-                    ? "Congratulations! You've earned spins."
-                    : 'Share verified successfully.',
+                    facebookPostUrl: $request
+                        ->string(
+                            'facebook_post_url'
+                        )
+                        ->toString(),
 
-                'data' => $result,
-            ]);
-        } catch (ValidationException $exception) {
-            throw $exception;
-        } catch (Throwable $exception) {
-            report($exception);
+                    ipAddress: $request->ip(),
 
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'Unable to verify the campaign share.',
-                'data' => null,
-            ], 500);
-        }
+                    userAgent:
+                        $request->userAgent()
+                );
+
+        return response()->json([
+            'success' => true,
+
+            'message' =>
+                'Your share link has been submitted successfully. Our team will review your public post within 7 days. Please make sure your post is set to Public and contains the correct campaign content. Invalid or unrelated submissions may be rejected. Once your post is approved and you meet the campaign requirements, your spins will be added to your account.',
+
+            'data' => $result,
+        ]);
+    } catch (ValidationException $exception) {
+        throw $exception;
+    } catch (Throwable $exception) {
+        report($exception);
+
+        return response()->json([
+            'success' => false,
+
+            'message' =>
+                'Unable to submit the campaign share link.',
+
+            'data' => null,
+        ], 500);
     }
+}
 
     /**
      * GET /api/campaign/{campaign}
