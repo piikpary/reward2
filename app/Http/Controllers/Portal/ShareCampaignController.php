@@ -316,13 +316,14 @@ class ShareCampaignController extends Controller
     ShareCampaign $shareCampaign
 ): View {
     $shares = $shareCampaign
-        ->shares()
-        ->with([
-            'user',
-            'reviewedBy',
-        ])
-        ->orderByDesc('shared_at')
-        ->paginate(25);
+    ->shares()
+    ->with([
+        'user',
+        'reviewedBy',
+    ])
+    ->orderByDesc('shared_at')
+    ->paginate(10)
+    ->withQueryString();
 
     $statistics = [
         'total_shares' =>
