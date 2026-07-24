@@ -290,4 +290,48 @@ class CampaignController extends Controller
             'data' => $data,
         ]);
     }
+            /**
+         * GET /api/campaigns/{campaignId}/user-share-status
+         *
+         * Return the authenticated user's latest submission,
+         * approved progress, reward status, and spin balance.
+         */
+        public function userShareStatus(
+            Request $request,
+            int $campaignId
+        ): JsonResponse {
+            $campaign = ShareCampaign::query()
+                ->find($campaignId);
+
+            if (!$campaign) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Campaign not found.',
+                    'data' => null,
+                ], 404);
+            }
+
+            try {
+                $data = $this
+                    ->campaignShareService
+                    ->userShareStatus(
+                        user: $request->user(),
+                        campaign: $campaign
+                    );
+
+                return response()->json([
+                    'success' => true,
+                    'data' => $data,
+                ]);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Unable to retrieve campaign share status.',
+                    'data' => null,
+                ], 500);
+            }
+        }
 }

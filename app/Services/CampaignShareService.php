@@ -61,6 +61,38 @@ class CampaignShareService
                         'This campaign is no longer available.',
                 ]);
             }
+            /*
+ * Load and lock existing approved progress.
+ *
+ * A completed one-time campaign must not accept
+ * another Facebook share submission.
+ */
+$progress = CampaignUserProgress::query()
+    ->where(
+        'share_campaign_id',
+        $campaign->id
+    )
+    ->where(
+        'user_id',
+        $user->id
+    )
+    ->lockForUpdate()
+    ->first();
+
+if (
+    !$campaign->reward_repeatable
+    && $progress
+    && (
+        (int) $progress->current_shares
+            >= (int) $campaign->required_shares
+        || (int) $progress->last_milestone_rewarded >= 1
+    )
+) {
+    throw ValidationException::withMessages([
+        'campaign_id' =>
+            'You have already completed this campaign and received its reward.',
+    ]);
+}
 
             $duplicate = CampaignShare::query()
                 ->where(
@@ -139,21 +171,6 @@ class CampaignShareService
                 ],
             ]);
 
-            /*
-             * Read existing approved progress only.
-             * The new pending link does not increase it.
-             */
-            $progress =
-                CampaignUserProgress::query()
-                    ->where(
-                        'share_campaign_id',
-                        $campaign->id
-                    )
-                    ->where(
-                        'user_id',
-                        $user->id
-                    )
-                    ->first();
 
             $rewardSummary = [
                 'eligible_milestone' => 0,
@@ -389,6 +406,194 @@ class CampaignShareService
             ? 1
             : 0;
     }
+    /**
+ * Return the authenticated user's share and reward
+ * status for one campaign.
+ */
+public function userShareStatus(
+    User $user,
+    ShareCampaign $campaign
+): array {
+    /*
+     * Progress contains only admin-approved shares.
+     */
+    $progress = CampaignUserProgress::query()
+        ->where(
+            'share_campaign_id',
+            $campaign->id
+        )
+        ->where(
+            'user_id',
+            $user->id
+        )
+        ->first();
+
+    /*
+     * Get the latest submitted Facebook link.
+     *
+     * This may be pending, approved, or rejected.
+     */
+    $latestShare = CampaignShare::query()
+        ->where(
+            'share_campaign_id',
+            $campaign->id
+        )
+        ->where(
+            'user_id',
+            $user->id
+        )
+        ->orderByDesc('shared_at')
+        ->orderByDesc('id')
+        ->first();
+
+    /*
+     * Get granted reward milestone records.
+     */
+    $rewards = CampaignShareReward::query()
+        ->where(
+            'share_campaign_id',
+            $campaign->id
+        )
+        ->where(
+            'user_id',
+            $user->id
+        )
+        ->get();
+
+    $currentShares = (int) (
+        $progress?->current_shares ?? 0
+    );
+
+    $eligibleMilestone = $this->eligibleMilestone(
+        $campaign,
+        $currentShares
+    );
+
+    $grantedMilestoneNumbers = $rewards
+        ->pluck('milestone_number')
+        ->map(
+            fn ($milestone): int =>
+                (int) $milestone
+        )
+        ->unique()
+        ->sort()
+        ->values();
+
+    /*
+     * Only count granted milestones that the user
+     * is currently eligible for.
+     */
+    $grantedEligibleCount =
+        $grantedMilestoneNumbers
+            ->filter(
+                fn (int $milestone): bool =>
+                    $milestone <= $eligibleMilestone
+            )
+            ->count();
+
+    $pendingMilestones = max(
+        0,
+        $eligibleMilestone
+            - $grantedEligibleCount
+    );
+
+    /*
+     * Convert internal database status into the
+     * status required by the mobile application.
+     */
+    $submissionStatus = match (
+        $latestShare?->status
+    ) {
+        'pending' =>
+            'pending_review',
+
+        'verified' =>
+            'approved',
+
+        'rejected' =>
+            'rejected',
+
+        default =>
+            'not_submitted',
+    };
+
+    $reviewWithinDays = null;
+    $reviewDueAt = null;
+
+    if ($latestShare) {
+        $reviewWithinDays = (int) data_get(
+            $latestShare->metadata,
+            'review_within_days',
+            7
+        );
+
+        $reviewDueAt = data_get(
+            $latestShare->metadata,
+            'review_due_at'
+        );
+
+        /*
+         * Support old records where review_due_at
+         * was not saved in metadata.
+         */
+        if (
+            !$reviewDueAt
+            && $latestShare->shared_at
+        ) {
+            $reviewDueAt = $latestShare
+                ->shared_at
+                ->copy()
+                ->addDays($reviewWithinDays)
+                ->toISOString();
+        }
+    }
+
+    return [
+        'currentShares' =>
+            $currentShares,
+
+        'requiredShares' =>
+            (int) $campaign->required_shares,
+
+        'remainingShares' =>
+            $this->remainingShares(
+                $campaign,
+                $progress
+            ),
+
+        'userShareUrl' =>
+            $latestShare?->facebook_post_url,
+
+        'submissionStatus' =>
+            $submissionStatus,
+
+        'reviewWithinDays' =>
+            $reviewWithinDays,
+
+        'reviewDueAt' =>
+            $reviewDueAt,
+
+        'pendingMilestones' =>
+            $pendingMilestones,
+
+        'grantedMilestones' =>
+            $grantedMilestoneNumbers->count(),
+
+        'rewardClaimed' =>
+            $grantedMilestoneNumbers
+                ->isNotEmpty(),
+
+        'totalSpins' =>
+            $this->currentSpinBalance(
+                $user->id
+            ),
+
+        'sharedAt' =>
+            $latestShare
+                ?->shared_at
+                ?->toISOString(),
+    ];
+}
 
     public function remainingShares(
         ShareCampaign $campaign,

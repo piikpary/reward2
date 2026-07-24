@@ -94,4 +94,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         'user-shares',
         [CampaignController::class, 'userShares']
     )->name('campaign.user-shares');
+
+
+        Route::get(
+        'campaigns/{campaignId}/user-share-status',
+        [
+            \App\Http\Controllers\v2\Campaign\CampaignController::class,
+            'userShareStatus',
+        ]
+    )
+        ->whereNumber('campaignId')
+        ->name('campaigns.user-share-status');
 });
