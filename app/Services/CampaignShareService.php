@@ -410,12 +410,16 @@ if (
  * Return the authenticated user's share and reward
  * status for one campaign.
  */
+/**
+ * Return the authenticated user's share and reward
+ * status for one campaign.
+ */
 public function userShareStatus(
     User $user,
     ShareCampaign $campaign
 ): array {
     /*
-     * Progress contains only admin-approved shares.
+     * Progress includes only admin-approved shares.
      */
     $progress = CampaignUserProgress::query()
         ->where(
@@ -429,11 +433,10 @@ public function userShareStatus(
         ->first();
 
     /*
-     * Get the latest submitted Facebook link.
-     *
-     * This may be pending, approved, or rejected.
+     * Load all links submitted by this user
+     * for this campaign, newest first.
      */
-    $latestShare = CampaignShare::query()
+    $shares = CampaignShare::query()
         ->where(
             'share_campaign_id',
             $campaign->id
@@ -444,10 +447,12 @@ public function userShareStatus(
         )
         ->orderByDesc('shared_at')
         ->orderByDesc('id')
-        ->first();
+        ->get();
+
+    $latestShare = $shares->first();
 
     /*
-     * Get granted reward milestone records.
+     * Load all granted reward milestones.
      */
     $rewards = CampaignShareReward::query()
         ->where(
@@ -464,53 +469,118 @@ public function userShareStatus(
         $progress?->current_shares ?? 0
     );
 
-    $eligibleMilestone = $this->eligibleMilestone(
+    $remainingShares = $this->remainingShares(
         $campaign,
-        $currentShares
+        $progress
     );
 
-    $grantedMilestoneNumbers = $rewards
-        ->pluck('milestone_number')
-        ->map(
-            fn ($milestone): int =>
-                (int) $milestone
-        )
-        ->unique()
-        ->sort()
+    /*
+     * This follows your requested response:
+     * pending links do not reduce remainingUploads.
+     * Only approved shares reduce it.
+     */
+    $remainingUploads = $remainingShares;
+
+    $canUploadMore =
+        $campaign->isAvailable()
+        && $remainingUploads > 0;
+
+    $rewardSummary = [
+        'pending_milestones' => 0,
+        'granted_milestones' => 0,
+        'reward_claimed' => false,
+    ];
+
+    if ($progress) {
+        $rewardSummary = $this->rewardSummary(
+            $campaign,
+            $progress,
+            $rewards
+        );
+    }
+
+    /*
+     * Format all submitted links for the API.
+     */
+    $userShareUrls = $shares
+        ->map(function (
+            CampaignShare $share
+        ): array {
+            $reviewWithinDays = (int) data_get(
+                $share->metadata,
+                'review_within_days',
+                7
+            );
+
+            $reviewDueAt = data_get(
+                $share->metadata,
+                'review_due_at'
+            );
+
+            /*
+             * Support old records that do not have
+             * review_due_at inside metadata.
+             */
+            if (
+                !$reviewDueAt
+                && $share->shared_at
+            ) {
+                $reviewDueAt = $share
+                    ->shared_at
+                    ->copy()
+                    ->addDays($reviewWithinDays)
+                    ->toISOString();
+            }
+
+            $submissionStatus = match (
+                $share->status
+            ) {
+                CampaignShare::STATUS_PENDING =>
+                    'pending_review',
+
+                CampaignShare::STATUS_VERIFIED =>
+                    'approved',
+
+                CampaignShare::STATUS_REJECTED =>
+                    'rejected',
+
+                default =>
+                    'not_submitted',
+            };
+
+            return [
+                'id' =>
+                    (int) $share->id,
+
+                'url' =>
+                    $share->facebook_post_url,
+
+                'submissionStatus' =>
+                    $submissionStatus,
+
+                'sharedAt' =>
+                    $share->shared_at
+                        ?->toISOString(),
+
+                'reviewDueAt' =>
+                    $reviewDueAt,
+            ];
+        })
         ->values();
 
     /*
-     * Only count granted milestones that the user
-     * is currently eligible for.
+     * Top-level status represents the newest link.
      */
-    $grantedEligibleCount =
-        $grantedMilestoneNumbers
-            ->filter(
-                fn (int $milestone): bool =>
-                    $milestone <= $eligibleMilestone
-            )
-            ->count();
-
-    $pendingMilestones = max(
-        0,
-        $eligibleMilestone
-            - $grantedEligibleCount
-    );
-
-    /*
-     * Convert internal database status into the
-     * status required by the mobile application.
-     */
-    $submissionStatus = match (
+    $latestSubmissionStatus = match (
         $latestShare?->status
     ) {
-        'pending' =>
+        CampaignShare::STATUS_PENDING =>
             'pending_review',
 
-        'verified' =>
+        CampaignShare::STATUS_VERIFIED =>
             'approved',
 
-        'rejected' =>
+        CampaignShare::STATUS_REJECTED =>
             'rejected',
 
         default =>
@@ -518,7 +588,7 @@ public function userShareStatus(
     };
 
     $reviewWithinDays = null;
-    $reviewDueAt = null;
+    $latestReviewDueAt = null;
 
     if ($latestShare) {
         $reviewWithinDays = (int) data_get(
@@ -527,20 +597,16 @@ public function userShareStatus(
             7
         );
 
-        $reviewDueAt = data_get(
+        $latestReviewDueAt = data_get(
             $latestShare->metadata,
             'review_due_at'
         );
 
-        /*
-         * Support old records where review_due_at
-         * was not saved in metadata.
-         */
         if (
-            !$reviewDueAt
+            !$latestReviewDueAt
             && $latestShare->shared_at
         ) {
-            $reviewDueAt = $latestShare
+            $latestReviewDueAt = $latestShare
                 ->shared_at
                 ->copy()
                 ->addDays($reviewWithinDays)
@@ -556,42 +622,48 @@ public function userShareStatus(
             (int) $campaign->required_shares,
 
         'remainingShares' =>
-            $this->remainingShares(
-                $campaign,
-                $progress
-            ),
+            $remainingShares,
 
-        'userShareUrl' =>
-            $latestShare?->facebook_post_url,
+        'canUploadMore' =>
+            $canUploadMore,
 
+        'remainingUploads' =>
+            $remainingUploads,
+
+        'userShareUrls' =>
+            $userShareUrls->all(),
+
+        /*
+         * Status of the newest submitted link.
+         */
         'submissionStatus' =>
-            $submissionStatus,
+            $latestSubmissionStatus,
 
         'reviewWithinDays' =>
             $reviewWithinDays,
 
         'reviewDueAt' =>
-            $reviewDueAt,
+            $latestReviewDueAt,
 
         'pendingMilestones' =>
-            $pendingMilestones,
+            (int) $rewardSummary[
+                'pending_milestones'
+            ],
 
         'grantedMilestones' =>
-            $grantedMilestoneNumbers->count(),
+            (int) $rewardSummary[
+                'granted_milestones'
+            ],
 
         'rewardClaimed' =>
-            $grantedMilestoneNumbers
-                ->isNotEmpty(),
+            (bool) $rewardSummary[
+                'reward_claimed'
+            ],
 
         'totalSpins' =>
             $this->currentSpinBalance(
                 $user->id
             ),
-
-        'sharedAt' =>
-            $latestShare
-                ?->shared_at
-                ?->toISOString(),
     ];
 }
 
