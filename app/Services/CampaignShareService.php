@@ -12,6 +12,7 @@ use App\Models\Wallet;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class CampaignShareService
 {
@@ -26,258 +27,351 @@ class CampaignShareService
      * This method does not verify the post,
      * increase campaign progress, or add spins.
      */
-    public function verify(
-        User $user,
-        ShareCampaign $campaign,
-        string $facebookPostUrl,
-        ?string $ipAddress,
-        ?string $userAgent
-    ): array {
-        $normalizedUrl = $this->urlService
-            ->normalize($facebookPostUrl);
-
-        $urlHash = $this->urlService
-            ->hash($normalizedUrl);
-
-        return DB::transaction(function () use (
-            $user,
-            $campaign,
-            $normalizedUrl,
-            $urlHash,
-            $ipAddress,
-            $userAgent
-        ): array {
-            $campaign = ShareCampaign::query()
-                ->whereKey($campaign->id)
-                ->lockForUpdate()
-                ->first();
-
-            if (
-                !$campaign
-                || !$campaign->isAvailable()
-            ) {
-                throw ValidationException::withMessages([
-                    'campaign_id' =>
-                        'This campaign is no longer available.',
-                ]);
-            }
-            /*
- * Load and lock existing approved progress.
+   /**
+ * Submit a Facebook link for manual review.
  *
- * A completed one-time campaign must not accept
- * another Facebook share submission.
+ * This method does not verify the post,
+ * increase campaign progress, or add spins.
  */
-$progress = CampaignUserProgress::query()
-    ->where(
-        'share_campaign_id',
-        $campaign->id
-    )
-    ->where(
-        'user_id',
-        $user->id
-    )
-    ->lockForUpdate()
-    ->first();
+public function verify(
+    User $user,
+    ShareCampaign $campaign,
+    string $facebookPostUrl,
+    ?string $ipAddress,
+    ?string $userAgent
+): array {
+    $normalizedUrl = $this->urlService
+        ->normalize($facebookPostUrl);
 
-if (
-    !$campaign->reward_repeatable
-    && $progress
-    && (
-        (int) $progress->current_shares
-            >= (int) $campaign->required_shares
-        || (int) $progress->last_milestone_rewarded >= 1
-    )
-) {
-    throw ValidationException::withMessages([
-        'campaign_id' =>
-            'You have already completed this campaign and received its reward.',
-    ]);
-}
+    $urlHash = $this->urlService
+        ->hash($normalizedUrl);
 
-            $duplicate = CampaignShare::query()
-                ->where(
-                    'facebook_post_url_hash',
-                    $urlHash
-                )
-                ->exists();
+    return DB::transaction(function () use (
+        $user,
+        $campaign,
+        $normalizedUrl,
+        $urlHash,
+        $ipAddress,
+        $userAgent
+    ): array {
+        /*
+         * Lock the campaign so simultaneous upload
+         * requests cannot exceed the maximum.
+         */
+        $campaign = ShareCampaign::query()
+            ->whereKey($campaign->id)
+            ->lockForUpdate()
+            ->first();
 
-            if ($duplicate) {
-                throw ValidationException::withMessages([
-                    'facebook_post_url' =>
-                        'This Facebook post has already been submitted.',
-                ]);
-            }
+        if (
+            !$campaign
+            || !$campaign->isAvailable()
+        ) {
+            throw ValidationException::withMessages([
+                'campaign_id' =>
+                    'This campaign is no longer available.',
+            ]);
+        }
 
-            $submittedAt = now();
+        /*
+         * Approved campaign progress.
+         */
+        $progress = CampaignUserProgress::query()
+            ->where(
+                'share_campaign_id',
+                $campaign->id
+            )
+            ->where(
+                'user_id',
+                $user->id
+            )
+            ->lockForUpdate()
+            ->first();
 
-            $reviewDueAt = $submittedAt
-                ->copy()
-                ->addDays(7);
+        $requiredShares = max(
+            0,
+            (int) $campaign->required_shares
+        );
 
-            /*
-             * Save the link as pending.
-             *
-             * Do not create or increment progress here.
-             */
-            $share = CampaignShare::query()->create([
-                'share_campaign_id' =>
-                    $campaign->id,
+        /*
+         * currentShares counts only approved shares.
+         */
+        $currentShares = (int) (
+            $progress?->current_shares ?? 0
+        );
 
-                'user_id' =>
-                    $user->id,
+        $remainingShares = max(
+            0,
+            $requiredShares - $currentShares
+        );
 
+        /*
+         * Count all links submitted by this user.
+         *
+         * Pending, approved, and rejected records
+         * all use one upload slot.
+         */
+        $submittedShares = CampaignShare::query()
+            ->where(
+                'share_campaign_id',
+                $campaign->id
+            )
+            ->where(
+                'user_id',
+                $user->id
+            )
+            ->count();
+
+        $remainingUploads = max(
+            0,
+            $requiredShares - $submittedShares
+        );
+
+        /*
+         * Block uploads after the user reaches the
+         * campaign's required number of shares.
+         */
+        if (
+            $requiredShares < 1
+            || $submittedShares >= $requiredShares
+            || $currentShares >= $requiredShares
+        ) {
+            throw new HttpResponseException(
+                response()->json([
+                    'success' => false,
+
+                    'message' =>
+                        'You have reached the maximum number of shares for this campaign.',
+
+                    'errors' => [
+                        'campaign_id' => [
+                            "You have already submitted the maximum of {$requiredShares} shares for this campaign. You cannot upload more.",
+                        ],
+                    ],
+
+                    'data' => [
+                        'currentShares' =>
+                            $currentShares,
+
+                        'requiredShares' =>
+                            $requiredShares,
+
+                        'remainingShares' =>
+                            $remainingShares,
+
+                        'canUploadMore' =>
+                            false,
+
+                        'remainingUploads' =>
+                            0,
+
+                        'campaignId' =>
+                            (int) $campaign->id,
+
+                        'campaignTitle' =>
+                            $campaign->title,
+                    ],
+                ], 422)
+            );
+        }
+
+        /*
+         * Prevent the same Facebook URL from being
+         * submitted more than once.
+         */
+        $duplicate = CampaignShare::query()
+            ->where(
+                'facebook_post_url_hash',
+                $urlHash
+            )
+            ->exists();
+
+        if ($duplicate) {
+            throw ValidationException::withMessages([
                 'facebook_post_url' =>
+                    'This Facebook post has already been submitted.',
+            ]);
+        }
+
+        $submittedAt = now();
+
+        $reviewDueAt = $submittedAt
+            ->copy()
+            ->addDays(7);
+
+        /*
+         * Save the new link as pending review.
+         *
+         * Do not increase progress or add spins here.
+         */
+        $share = CampaignShare::query()->create([
+            'share_campaign_id' =>
+                $campaign->id,
+
+            'user_id' =>
+                $user->id,
+
+            'facebook_post_url' =>
+                $normalizedUrl,
+
+            'facebook_post_url_hash' =>
+                $urlHash,
+
+            'status' =>
+                CampaignShare::STATUS_PENDING,
+
+            'verification_method' =>
+                'manual_review',
+
+            'shared_at' =>
+                $submittedAt,
+
+            'verified_at' =>
+                null,
+
+            'reviewed_by' =>
+                null,
+
+            'reviewed_at' =>
+                null,
+
+            'rejection_reason' =>
+                null,
+
+            'ip_address' =>
+                $ipAddress,
+
+            'user_agent' =>
+                $userAgent,
+
+            'metadata' => [
+                'normalized_url' =>
                     $normalizedUrl,
 
-                'facebook_post_url_hash' =>
-                    $urlHash,
-
-                'status' =>
-                    CampaignShare::STATUS_PENDING,
-
-                'verification_method' =>
-                    'manual_review',
-
-                'shared_at' =>
-                    $submittedAt,
-
-                'verified_at' =>
-                    null,
-
-                'reviewed_by' =>
-                    null,
-
-                'reviewed_at' =>
-                    null,
-
-                'rejection_reason' =>
-                    null,
-
-                'ip_address' =>
-                    $ipAddress,
-
-                'user_agent' =>
-                    $userAgent,
-
-                'metadata' => [
-                    'normalized_url' =>
-                        $normalizedUrl,
-
-                    'review_within_days' =>
-                        7,
-
-                    'review_due_at' =>
-                        $reviewDueAt->toISOString(),
-                ],
-            ]);
-
-
-            $rewardSummary = [
-                'eligible_milestone' => 0,
-                'next_pending_milestone' => null,
-                'pending_milestones' => 0,
-                'granted_milestones' => 0,
-                'eligible_for_reward' => false,
-                'reward_status' => 'not_eligible',
-                'reward_claimed' => false,
-            ];
-
-            if ($progress) {
-                $rewardSummary =
-                    $this->rewardSummary(
-                        $campaign,
-                        $progress
-                    );
-            }
-
-            return [
-                'shareId' =>
-                    $share->id,
-
-                'campaignId' =>
-                    $campaign->id,
-
-                'campaignTitle' =>
-                    $campaign->title,
-
-                /*
-                 * Submission status is different
-                 * from reward status.
-                 */
-                'submissionStatus' =>
-                    'pending_review',
-
-                'reviewWithinDays' =>
+                'review_within_days' =>
                     7,
 
-                'reviewDueAt' =>
+                'review_due_at' =>
                     $reviewDueAt->toISOString(),
+            ],
+        ]);
 
-                /*
-                 * Count only approved shares.
-                 */
-                'currentShares' =>
-                    (int) (
-                        $progress
-                            ?->current_shares ?? 0
-                    ),
+        /*
+         * Calculate upload availability after the
+         * newly submitted link.
+         */
+        $submittedSharesAfterUpload =
+            $submittedShares + 1;
 
-                'requiredShares' =>
-                    (int) $campaign->required_shares,
+        $remainingUploadsAfterUpload = max(
+            0,
+            $requiredShares
+                - $submittedSharesAfterUpload
+        );
 
-                'remainingShares' =>
-                    $this->remainingShares(
-                        $campaign,
-                        $progress
-                    ),
+        $canUploadMoreAfterUpload =
+            $campaign->isAvailable()
+            && $remainingUploadsAfterUpload > 0
+            && $currentShares < $requiredShares;
 
-                'rewardSpins' =>
-                    (int) $campaign->reward_spins,
+        $rewardSummary = [
+            'eligible_milestone' => 0,
+            'next_pending_milestone' => null,
+            'pending_milestones' => 0,
+            'granted_milestones' => 0,
+            'eligible_for_reward' => false,
+            'reward_status' => 'not_eligible',
+            'reward_claimed' => false,
+        ];
 
-                /*
-                 * API submission never awards spins.
-                 */
-                'spinAwarded' =>
-                    false,
+        if ($progress) {
+            $rewardSummary = $this->rewardSummary(
+                $campaign,
+                $progress
+            );
+        }
 
-                'rewardSpinsAwarded' =>
-                    0,
+        return [
+            'shareId' =>
+                (int) $share->id,
 
-                'eligibleForReward' =>
-                    $rewardSummary[
-                        'eligible_for_reward'
-                    ],
+            'campaignId' =>
+                (int) $campaign->id,
 
-                'rewardStatus' =>
-                    $rewardSummary[
-                        'reward_status'
-                    ],
+            'campaignTitle' =>
+                $campaign->title,
 
-                'pendingMilestones' =>
-                    $rewardSummary[
-                        'pending_milestones'
-                    ],
+            'submissionStatus' =>
+                'pending_review',
 
-                'grantedMilestones' =>
-                    $rewardSummary[
-                        'granted_milestones'
-                    ],
+            'reviewWithinDays' =>
+                7,
 
-                'rewardClaimed' =>
-                    $rewardSummary[
-                        'reward_claimed'
-                    ],
+            'reviewDueAt' =>
+                $reviewDueAt->toISOString(),
 
-                'totalSpins' =>
-                    $this->currentSpinBalance(
-                        $user->id
-                    ),
+            /*
+             * Pending uploads do not increase this.
+             */
+            'currentShares' =>
+                $currentShares,
 
-                'sharedAt' =>
-                    $submittedAt->toISOString(),
-            ];
-        }, 5);
-    }
+            'requiredShares' =>
+                $requiredShares,
+
+            'remainingShares' =>
+                $remainingShares,
+
+            'canUploadMore' =>
+                $canUploadMoreAfterUpload,
+
+            'remainingUploads' =>
+                $remainingUploadsAfterUpload,
+
+            'rewardSpins' =>
+                (int) $campaign->reward_spins,
+
+            'spinAwarded' =>
+                false,
+
+            'rewardSpinsAwarded' =>
+                0,
+
+            'eligibleForReward' =>
+                $rewardSummary[
+                    'eligible_for_reward'
+                ],
+
+            'rewardStatus' =>
+                $rewardSummary[
+                    'reward_status'
+                ],
+
+            'pendingMilestones' =>
+                $rewardSummary[
+                    'pending_milestones'
+                ],
+
+            'grantedMilestones' =>
+                $rewardSummary[
+                    'granted_milestones'
+                ],
+
+            'rewardClaimed' =>
+                $rewardSummary[
+                    'reward_claimed'
+                ],
+
+            'totalSpins' =>
+                $this->currentSpinBalance(
+                    $user->id
+                ),
+
+            'sharedAt' =>
+                $submittedAt->toISOString(),
+        ];
+    }, 5);
+}
 
     /**
      * Calculate reward information using only
@@ -465,26 +559,37 @@ public function userShareStatus(
         )
         ->get();
 
+        
     $currentShares = (int) (
-        $progress?->current_shares ?? 0
-    );
+    $progress?->current_shares ?? 0
+);
 
-    $remainingShares = $this->remainingShares(
-        $campaign,
-        $progress
-    );
+$requiredShares = max(
+    0,
+    (int) $campaign->required_shares
+);
 
-    /*
-     * This follows your requested response:
-     * pending links do not reduce remainingUploads.
-     * Only approved shares reduce it.
-     */
-    $remainingUploads = $remainingShares;
+$remainingShares = max(
+    0,
+    $requiredShares - $currentShares
+);
 
-    $canUploadMore =
-        $campaign->isAvailable()
-        && $remainingUploads > 0;
+/*
+ * Every submitted link uses one upload slot.
+ */
+$submittedShares = $shares->count();
 
+$remainingUploads = max(
+    0,
+    $requiredShares - $submittedShares
+);
+
+$canUploadMore =
+    $campaign->isAvailable()
+    && $remainingUploads > 0
+    && $currentShares < $requiredShares;
+
+        
     $rewardSummary = [
         'pending_milestones' => 0,
         'granted_milestones' => 0,
@@ -619,7 +724,7 @@ public function userShareStatus(
             $currentShares,
 
         'requiredShares' =>
-            (int) $campaign->required_shares,
+            $requiredShares,
 
         'remainingShares' =>
             $remainingShares,

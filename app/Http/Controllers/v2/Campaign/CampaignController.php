@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Throwable;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class CampaignController extends Controller
 {
@@ -116,6 +117,8 @@ class CampaignController extends Controller
             'data' => $result,
         ]);
     } catch (ValidationException $exception) {
+    throw $exception;
+    } catch (HttpResponseException $exception) {
         throw $exception;
     } catch (Throwable $exception) {
         report($exception);
