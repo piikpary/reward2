@@ -17,10 +17,16 @@ use App\Models\CampaignShare;
 use App\Models\CampaignUserProgress;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use App\Services\CampaignShareRewardService;
 
 
 class ShareCampaignController extends Controller
 {
+    public function __construct(
+        private readonly CampaignShareRewardService
+            $campaignShareRewardService
+    ) {
+    }
     /**
      * Display campaigns.
      */
@@ -388,6 +394,8 @@ class ShareCampaignController extends Controller
  * Approve one submitted Facebook post.
  *
  * This is where verified campaign progress increases.
+ * When the required approved shares are completed,
+ * the campaign spin reward is automatically awarded.
  */
 public function approveShare(
     Request $request,
@@ -401,23 +409,19 @@ public function approveShare(
                 $shareCampaign,
                 $share
             ): array {
-                $campaign =
-                    ShareCampaign::query()
-                        ->whereKey(
-                            $shareCampaign->id
-                        )
-                        ->lockForUpdate()
-                        ->firstOrFail();
+                $campaign = ShareCampaign::query()
+                    ->whereKey($shareCampaign->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                $share =
-                    CampaignShare::query()
-                        ->whereKey($share->id)
-                        ->where(
-                            'share_campaign_id',
-                            $campaign->id
-                        )
-                        ->lockForUpdate()
-                        ->firstOrFail();
+                $share = CampaignShare::query()
+                    ->whereKey($share->id)
+                    ->where(
+                        'share_campaign_id',
+                        $campaign->id
+                    )
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 if (
                     $share->status !==
@@ -454,18 +458,17 @@ public function approveShare(
                             now(),
                     ]);
 
-                $progress =
-                    CampaignUserProgress::query()
-                        ->where(
-                            'share_campaign_id',
-                            $campaign->id
-                        )
-                        ->where(
-                            'user_id',
-                            $share->user_id
-                        )
-                        ->lockForUpdate()
-                        ->firstOrFail();
+                $progress = CampaignUserProgress::query()
+                    ->where(
+                        'share_campaign_id',
+                        $campaign->id
+                    )
+                    ->where(
+                        'user_id',
+                        $share->user_id
+                    )
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
                 $share->update([
                     'status' =>
@@ -507,20 +510,66 @@ public function approveShare(
 
                 $campaign->save();
 
+                /*
+                 * Automatically award the campaign
+                 * reward when approved progress reaches
+                 * the required number of shares.
+                 *
+                 * Returns null when the requirement is
+                 * not complete or reward already exists.
+                 */
+                $rewardResult =
+                    $this->campaignShareRewardService
+                        ->awardIfEligible(
+                            progress: $progress,
+                            grantedBy: null
+                        );
+
                 return [
                     'current_shares' =>
                         (int) $progress->current_shares,
 
                     'required_shares' =>
                         (int) $campaign->required_shares,
+
+                    'reward_awarded' =>
+                        $rewardResult !== null,
+
+                    'reward_spins' =>
+                        (int) (
+                            $rewardResult[
+                                'reward_spins'
+                            ] ?? 0
+                        ),
+
+                    'balance' =>
+                        $rewardResult[
+                            'balance'
+                        ] ?? null,
+
+                    'transaction_id' =>
+                        $rewardResult[
+                            'transaction_id'
+                        ] ?? null,
                 ];
             },
             5
         );
 
+        $message =
+            "Share approved successfully. Verified progress: "
+            . "{$result['current_shares']} / "
+            . "{$result['required_shares']}.";
+
+        if ($result['reward_awarded']) {
+            $message .=
+                " {$result['reward_spins']} Spins were "
+                . "automatically added to the user's account.";
+        }
+
         return back()->with(
             'success',
-            "Share approved successfully. Verified progress: {$result['current_shares']} / {$result['required_shares']}."
+            $message
         );
     } catch (ValidationException $exception) {
         return back()->withErrors(

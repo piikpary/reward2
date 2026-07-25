@@ -165,6 +165,9 @@ public function verify(
                         'remainingUploads' =>
                             0,
 
+                        'isComplete' =>
+                        $currentShares >= $requiredShares,
+
                         'campaignId' =>
                             (int) $campaign->id,
 
@@ -328,6 +331,10 @@ public function verify(
             'remainingUploads' =>
                 $remainingUploadsAfterUpload,
 
+            'isComplete' =>
+                $requiredShares > 0
+                && $currentShares >= $requiredShares,
+
             'rewardSpins' =>
                 (int) $campaign->reward_spins,
 
@@ -362,6 +369,8 @@ public function verify(
                     'reward_claimed'
                 ],
 
+
+                
             'totalSpins' =>
                 $this->currentSpinBalance(
                     $user->id
@@ -369,6 +378,9 @@ public function verify(
 
             'sharedAt' =>
                 $submittedAt->toISOString(),
+
+            'transaction' =>
+                null,
         ];
     }, 5);
 }
@@ -549,6 +561,10 @@ public function userShareStatus(
      * Load all granted reward milestones.
      */
     $rewards = CampaignShareReward::query()
+        ->with([
+            'walletTransaction.fromUser',
+            'walletTransaction.toUser',
+        ])
         ->where(
             'share_campaign_id',
             $campaign->id
@@ -557,6 +573,8 @@ public function userShareStatus(
             'user_id',
             $user->id
         )
+        ->orderByDesc('awarded_at')
+        ->orderByDesc('id')
         ->get();
 
         
@@ -588,6 +606,33 @@ $canUploadMore =
     $campaign->isAvailable()
     && $remainingUploads > 0
     && $currentShares < $requiredShares;
+
+    $isComplete =
+    $requiredShares > 0
+    && $currentShares >= $requiredShares;
+
+$latestReward =
+    $rewards->first();
+
+$rewardTransaction =
+    $latestReward?->walletTransaction;
+
+$spinAwarded =
+    $rewardTransaction !== null;
+
+$rewardSpinsAwarded =
+    $latestReward
+        ? (int) $latestReward->reward_spins
+        : 0;
+
+$rewardStatus =
+    $spinAwarded
+        ? 'awarded'
+        : (
+            $isComplete
+                ? 'pending'
+                : 'not_eligible'
+        );
 
         
     $rewardSummary = [
@@ -735,6 +780,21 @@ $canUploadMore =
         'remainingUploads' =>
             $remainingUploads,
 
+        'isComplete' =>
+            $isComplete,
+
+        'rewardSpins' =>
+            (int) $campaign->reward_spins,
+
+        'spinAwarded' =>
+            $spinAwarded,
+
+        'rewardSpinsAwarded' =>
+            $rewardSpinsAwarded,
+
+        'rewardStatus' =>
+            $rewardStatus,
+
         'userShareUrls' =>
             $userShareUrls->all(),
 
@@ -761,14 +821,61 @@ $canUploadMore =
             ],
 
         'rewardClaimed' =>
-            (bool) $rewardSummary[
-                'reward_claimed'
-            ],
+    $latestReward !== null,
 
-        'totalSpins' =>
-            $this->currentSpinBalance(
-                $user->id
-            ),
+'totalSpins' =>
+    $this->currentSpinBalance(
+        $user->id
+    ),
+
+'transaction' =>
+    $rewardTransaction
+        ? [
+            'id' =>
+                (int) $rewardTransaction->id,
+
+            'transaction_type' =>
+                $rewardTransaction
+                    ->transaction_type,
+
+            'wallet_type' =>
+                $rewardTransaction
+                    ->wallet_type,
+
+            'amount' =>
+                (float) $rewardTransaction
+                    ->amount,
+
+            'from' =>
+                $rewardTransaction
+                    ->fromUser
+                    ?->phone_number,
+
+            'to' =>
+                $rewardTransaction
+                    ->toUser
+                    ?->phone_number,
+
+            'special_reward_code' =>
+                $rewardTransaction
+                    ->special_reward_code,
+
+            'description' =>
+                $rewardTransaction
+                    ->description,
+
+            'campaign_id' =>
+                (int) $campaign->id,
+
+            'campaign_title' =>
+                $campaign->title,
+
+            'created_at' =>
+                $rewardTransaction
+                    ->created_at
+                    ?->toISOString(),
+        ]
+        : null,
     ];
 }
 
