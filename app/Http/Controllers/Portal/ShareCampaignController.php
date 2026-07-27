@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Throwable;
 use App\Models\CampaignShare;
 use App\Models\CampaignUserProgress;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Services\CampaignShareRewardService;
