@@ -316,20 +316,114 @@ class ShareCampaignController extends Controller
     }
 
     /**
-     * Display customers who shared this campaign.
-     */
-    public function shares(
+ * Display customers who shared this campaign.
+ */
+public function shares(
+    Request $request,
     ShareCampaign $shareCampaign
 ): View {
+    $validated = $request->validate([
+        'date_from' => [
+            'nullable',
+            'date',
+        ],
+
+        'date_to' => [
+            'nullable',
+            'date',
+            'after_or_equal:date_from',
+        ],
+
+        'user_id' => [
+            'nullable',
+            'integer',
+            'exists:users,id',
+        ],
+
+        'review_status' => [
+            'nullable',
+            'in:pending,verified,rejected',
+        ],
+    ]);
+
     $shares = $shareCampaign
-    ->shares()
-    ->with([
-        'user',
-        'reviewedBy',
-    ])
-    ->orderByDesc('shared_at')
-    ->paginate(10)
-    ->withQueryString();
+        ->shares()
+        ->with([
+            'user',
+            'reviewedBy',
+        ])
+        ->when(
+            !empty($validated['date_from']),
+            fn ($query) =>
+                $query->whereDate(
+                    'shared_at',
+                    '>=',
+                    $validated['date_from']
+                )
+        )
+        ->when(
+            !empty($validated['date_to']),
+            fn ($query) =>
+                $query->whereDate(
+                    'shared_at',
+                    '<=',
+                    $validated['date_to']
+                )
+        )
+        ->when(
+            !empty($validated['user_id']),
+            fn ($query) =>
+                $query->where(
+                    'user_id',
+                    $validated['user_id']
+                )
+        )
+        ->when(
+            !empty($validated['review_status']),
+            fn ($query) =>
+                $query->where(
+                    'status',
+                    $validated['review_status']
+                )
+        )
+        ->orderByDesc('shared_at')
+        ->orderByDesc('id')
+        ->paginate(20)
+        ->withQueryString();
+
+    /*
+     * Group only the current pagination page.
+     */
+    $groupedShares = $shares
+        ->getCollection()
+        ->groupBy(
+            fn (CampaignShare $share): string =>
+                $share->shared_at
+                    ?->toDateString()
+                ?? 'unknown'
+        );
+
+    /*
+     * Users who submitted links to this campaign.
+     */
+    $users = User::query()
+        ->whereIn(
+            'id',
+            CampaignShare::query()
+                ->where(
+                    'share_campaign_id',
+                    $shareCampaign->id
+                )
+                ->select('user_id')
+                ->distinct()
+        )
+        ->orderBy('name')
+        ->orderBy('phone_number')
+        ->get([
+            'id',
+            'name',
+            'phone_number',
+        ]);
 
     $statistics = [
         'total_shares' =>
@@ -386,6 +480,8 @@ class ShareCampaignController extends Controller
         compact(
             'shareCampaign',
             'shares',
+            'groupedShares',
+            'users',
             'statistics'
         )
     );

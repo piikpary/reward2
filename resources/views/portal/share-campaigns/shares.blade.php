@@ -201,6 +201,88 @@
             line-height: 1.6;
         }
 
+        .report-filter {
+            padding: 18px 24px;
+            border-bottom: 1px solid #eeeeee;
+            background: #ffffff;
+        }
+
+        .report-filter-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(2, minmax(160px, 1fr))
+                minmax(220px, 1.4fr)
+                minmax(190px, 1fr)
+                auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        .report-filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .report-filter-label {
+            color: #374151;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .report-filter-input {
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background: #ffffff;
+            color: #111827;
+            font-size: 14px;
+        }
+
+        .report-filter-input:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow:
+                0 0 0 3px
+                rgba(37, 99, 235, 0.12);
+        }
+
+        .report-filter-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .share-date-group-row td {
+            padding: 14px 16px !important;
+            border-top: 1px solid #dbeafe;
+            border-bottom: 1px solid #dbeafe;
+            background: #eff6ff;
+        }
+
+        .share-date-group-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .share-date-group-label {
+            color: #1e3a8a;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .share-date-group-count {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
         .report-table-card .table-wrapper {
             padding: 0 18px 18px;
         }
@@ -284,6 +366,11 @@
         }
 
         @media (max-width: 1200px) {
+            .report-filter-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
             .campaign-meta-grid {
                 grid-template-columns:
                     repeat(2, minmax(0, 1fr));
@@ -310,6 +397,18 @@
         }
 
         @media (max-width: 700px) {
+            .report-filter-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .report-filter-actions {
+                width: 100%;
+            }
+
+            .report-filter-actions .button {
+                flex: 1;
+            }
+
             .campaign-meta-grid,
             .statistics.statistics-report {
                 grid-template-columns: 1fr;
@@ -698,6 +797,154 @@
                 </p>
             </div>
 
+            <div class="report-filter">
+                <form
+                    method="GET"
+                    action="{{ url()->current() }}"
+                >
+                    <div class="report-filter-grid">
+                        <div class="report-filter-field">
+                            <label
+                                class="report-filter-label"
+                                for="date_from"
+                            >
+                                Date From
+                            </label>
+
+                            <input
+                                class="report-filter-input"
+                                type="date"
+                                id="date_from"
+                                name="date_from"
+                                value="{{ request('date_from') }}"
+                            >
+                        </div>
+
+                        <div class="report-filter-field">
+                            <label
+                                class="report-filter-label"
+                                for="date_to"
+                            >
+                                Date To
+                            </label>
+
+                            <input
+                                class="report-filter-input"
+                                type="date"
+                                id="date_to"
+                                name="date_to"
+                                value="{{ request('date_to') }}"
+                            >
+                        </div>
+
+                        <div class="report-filter-field">
+                            <label
+                                class="report-filter-label"
+                                for="user_id"
+                            >
+                                Customer
+                            </label>
+
+                            <select
+                                class="report-filter-input"
+                                id="user_id"
+                                name="user_id"
+                            >
+                                <option value="">
+                                    All Customers
+                                </option>
+
+                                @foreach ($users as $filterUser)
+                                    <option
+                                        value="{{ $filterUser->id }}"
+                                        @selected(
+                                            (string) request('user_id')
+                                            === (string) $filterUser->id
+                                        )
+                                    >
+                                        {{
+                                            $filterUser->name
+                                            ?: 'Customer #'
+                                                . $filterUser->id
+                                        }}
+                                        —
+                                        {{
+                                            $filterUser->phone_number
+                                            ?: 'No phone'
+                                        }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="report-filter-field">
+                            <label
+                                class="report-filter-label"
+                                for="review_status"
+                            >
+                                Review Status
+                            </label>
+
+                            <select
+                                class="report-filter-input"
+                                id="review_status"
+                                name="review_status"
+                            >
+                                <option value="">
+                                    All Statuses
+                                </option>
+
+                                <option
+                                    value="pending"
+                                    @selected(
+                                        request('review_status')
+                                        === 'pending'
+                                    )
+                                >
+                                    Pending Review
+                                </option>
+
+                                <option
+                                    value="verified"
+                                    @selected(
+                                        request('review_status')
+                                        === 'verified'
+                                    )
+                                >
+                                    Approved
+                                </option>
+
+                                <option
+                                    value="rejected"
+                                    @selected(
+                                        request('review_status')
+                                        === 'rejected'
+                                    )
+                                >
+                                    Rejected
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="report-filter-actions">
+                            <button
+                                class="button button-primary"
+                                type="submit"
+                            >
+                                Filter
+                            </button>
+
+                            <a
+                                class="button button-secondary"
+                                href="{{ url()->current() }}"
+                            >
+                                Clear
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
             <div class="table-wrapper">
                 <table class="campaign-table report-table">
                     <thead>
@@ -715,317 +962,380 @@
                     </thead>
 
                     <tbody>
-                        @forelse ($shares as $share)
-                            @php
-                                $customerName =
-                                    $share->user?->name
-                                    ?? $share->user?->phone_number
-                                    ?? 'Customer #' . $share->user_id;
+                        @php
+                            $rowNumber =
+                                ($shares->currentPage() - 1)
+                                * $shares->perPage();
+                        @endphp
 
-                                $customerPhone =
-                                    $share->user?->phone_number
-                                    ?? 'N/A';
+                        @forelse ($groupedShares as $dateKey => $dateShares)
+                            @php
+                                if ($dateKey === 'unknown') {
+                                    $dateLabel = 'Unknown Date';
+                                } else {
+                                    $groupDate =
+                                        \Illuminate\Support\Carbon
+                                            ::parse($dateKey);
+
+                                    if ($groupDate->isToday()) {
+                                        $dateLabel = 'Today';
+                                    } elseif (
+                                        $groupDate->isYesterday()
+                                    ) {
+                                        $dateLabel = 'Yesterday';
+                                    } else {
+                                        $dateLabel =
+                                            $groupDate->format(
+                                                'l d F Y'
+                                            );
+                                    }
+                                }
                             @endphp
 
-                            <tr>
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{
-                                            ($shares->currentPage() - 1)
-                                            * $shares->perPage()
-                                            + $loop->iteration
-                                        }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{ $customerName }}
-                                    </div>
-
-                                    <div class="table-cell-sub">
-                                        User ID:
-                                        {{ $share->user_id }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{ $customerPhone }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <a
-                                        class="facebook-link"
-                                        href="{{
-                                            $share
-                                                ->facebook_post_url
-                                        }}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                            <tr class="share-date-group-row">
+                                <td colspan="9">
+                                    <div
+                                        class="
+                                            share-date-group-content
+                                        "
                                     >
-                                        Open Facebook Post
-                                    </a>
-
-                                    <div class="table-cell-sub">
-                                        {{
-                                            \Illuminate\Support\Str
-                                                ::limit(
-                                                    $share
-                                                        ->facebook_post_url,
-                                                    60
-                                                )
-                                        }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{
-                                            $share
-                                                ->shared_at
-                                                ?->format(
-                                                    'd M Y H:i:s'
-                                                )
-                                            ?? '-'
-                                        }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    @if (
-                                        $share->status ===
-                                        \App\Models\CampaignShare
-                                            ::STATUS_PENDING
-                                    )
                                         <span
                                             class="
-                                                badge
-                                                badge-warning
+                                                share-date-group-label
                                             "
                                         >
-                                            Pending Review
+                                            {{ $dateLabel }}
                                         </span>
-                                    @elseif (
-                                        $share->status ===
-                                        \App\Models\CampaignShare
-                                            ::STATUS_VERIFIED
-                                    )
+
                                         <span
                                             class="
-                                                badge
-                                                badge-success
-                                            "
-                                        >
-                                            Approved
-                                        </span>
-                                    @elseif (
-                                        $share->status ===
-                                        \App\Models\CampaignShare
-                                            ::STATUS_REJECTED
-                                    )
-                                        <span
-                                            class="
-                                                badge
-                                                badge-danger
-                                            "
-                                        >
-                                            Rejected
-                                        </span>
-                                    @else
-                                        <span
-                                            class="
-                                                badge
-                                                badge-gray
+                                                share-date-group-count
                                             "
                                         >
                                             {{
-                                                ucfirst(
-                                                    $share->status
-                                                )
+                                                $dateShares->count()
+                                            }}
+                                            {{
+                                                $dateShares->count()
+                                                === 1
+                                                    ? 'submission'
+                                                    : 'submissions'
                                             }}
                                         </span>
-                                    @endif
-
-                                    <div class="table-cell-sub">
-                                        Method:
-                                        {{
-                                            str_replace(
-                                                '_',
-                                                ' ',
-                                                ucfirst(
-                                                    $share
-                                                        ->verification_method
-                                                )
-                                            )
-                                        }}
                                     </div>
                                 </td>
+                            </tr>
 
-                                <td>
-                                    @if ($share->reviewed_at)
+                            @foreach ($dateShares as $share)
+                                @php
+                                    $rowNumber++;
+
+                                    $customerName =
+                                        $share->user?->name
+                                        ?? $share->user?->phone_number
+                                        ?? 'Customer #' . $share->user_id;
+
+                                    $customerPhone =
+                                        $share->user?->phone_number
+                                        ?? 'N/A';
+                                @endphp
+
+                                <tr>
+                                    <td>
                                         <div class="table-cell-main">
-                                            {{
-                                                $share
-                                                    ->reviewed_at
-                                                    ->format(
-                                                        'd M Y H:i'
-                                                    )
-                                            }}
+                                            {{ $rowNumber }}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="table-cell-main">
+                                            {{ $customerName }}
                                         </div>
 
                                         <div class="table-cell-sub">
-                                            Reviewed by:
-                                            {{
+                                            User ID:
+                                            {{ $share->user_id }}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <div class="table-cell-main">
+                                            {{ $customerPhone }}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        <a
+                                            class="facebook-link"
+                                            href="{{
                                                 $share
-                                                    ->reviewedBy
-                                                    ?->name
-                                                ?? 'Unknown admin'
+                                                    ->facebook_post_url
+                                            }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Open Facebook Post
+                                        </a>
+
+                                        <div class="table-cell-sub">
+                                            {{
+                                                \Illuminate\Support\Str
+                                                    ::limit(
+                                                        $share
+                                                            ->facebook_post_url,
+                                                        60
+                                                    )
                                             }}
                                         </div>
+                                    </td>
 
+                                    <td>
+                                        <div class="table-cell-main">
+                                            {{
+                                                $share
+                                                    ->shared_at
+                                                    ?->format(
+                                                        'd M Y H:i:s'
+                                                    )
+                                                ?? '-'
+                                            }}
+                                        </div>
+                                    </td>
+
+                                    <td>
                                         @if (
-                                            $share
-                                                ->rejection_reason
+                                            $share->status ===
+                                            \App\Models\CampaignShare
+                                                ::STATUS_PENDING
                                         )
-                                            <div class="review-reason">
-                                                <strong>
-                                                    Reason:
-                                                </strong>
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-warning
+                                                "
+                                            >
+                                                Pending Review
+                                            </span>
+                                        @elseif (
+                                            $share->status ===
+                                            \App\Models\CampaignShare
+                                                ::STATUS_VERIFIED
+                                        )
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-success
+                                                "
+                                            >
+                                                Approved
+                                            </span>
+                                        @elseif (
+                                            $share->status ===
+                                            \App\Models\CampaignShare
+                                                ::STATUS_REJECTED
+                                        )
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-danger
+                                                "
+                                            >
+                                                Rejected
+                                            </span>
+                                        @else
+                                            <span
+                                                class="
+                                                    badge
+                                                    badge-gray
+                                                "
+                                            >
+                                                {{
+                                                    ucfirst(
+                                                        $share->status
+                                                    )
+                                                }}
+                                            </span>
+                                        @endif
 
+                                        <div class="table-cell-sub">
+                                            Method:
+                                            {{
+                                                str_replace(
+                                                    '_',
+                                                    ' ',
+                                                    ucfirst(
+                                                        $share
+                                                            ->verification_method
+                                                    )
+                                                )
+                                            }}
+                                        </div>
+                                    </td>
+
+                                    <td>
+                                        @if ($share->reviewed_at)
+                                            <div class="table-cell-main">
                                                 {{
                                                     $share
-                                                        ->rejection_reason
+                                                        ->reviewed_at
+                                                        ->format(
+                                                            'd M Y H:i'
+                                                        )
                                                 }}
                                             </div>
+
+                                            <div class="table-cell-sub">
+                                                Reviewed by:
+                                                {{
+                                                    $share
+                                                        ->reviewedBy
+                                                        ?->name
+                                                    ?? 'Unknown admin'
+                                                }}
+                                            </div>
+
+                                            @if (
+                                                $share
+                                                    ->rejection_reason
+                                            )
+                                                <div class="review-reason">
+                                                    <strong>
+                                                        Reason:
+                                                    </strong>
+
+                                                    {{
+                                                        $share
+                                                            ->rejection_reason
+                                                    }}
+                                                </div>
+                                            @endif
+                                        @else
+                                            <span class="muted">
+                                                Not reviewed yet
+                                            </span>
                                         @endif
-                                    @else
-                                        <span class="muted">
-                                            Not reviewed yet
-                                        </span>
-                                    @endif
-                                </td>
+                                    </td>
 
-                                <td>
-                                    <div class="table-cell-main">
-                                        {{
-                                            $share->ip_address
-                                            ?? 'N/A'
-                                        }}
-                                    </div>
-                                </td>
-
-                                <td>
-                                    @if (
-                                        $share->status ===
-                                        \App\Models\CampaignShare
-                                            ::STATUS_PENDING
-                                    )
-                                        <div class="review-actions">
-                                            <form
-                                                method="POST"
-                                                action="{{ route(
-                                                    'portal.share-campaigns.shares.approve',
-                                                    [
-                                                        'shareCampaign' =>
-                                                            $shareCampaign,
-
-                                                        'share' =>
-                                                            $share,
-                                                    ]
-                                                ) }}"
-                                                onsubmit="
-                                                    return confirm(
-                                                        'Approve this Facebook post?'
-                                                    );
-                                                "
-                                            >
-                                                @csrf
-                                                @method('PATCH')
-
-                                                <button
-                                                    class="
-                                                        button
-                                                        button-small
-                                                        button-success
-                                                    "
-                                                    type="submit"
-                                                >
-                                                    Approve
-                                                </button>
-                                            </form>
-
-                                            <form
-                                                method="POST"
-                                                action="{{ route(
-                                                    'portal.share-campaigns.shares.reject',
-                                                    [
-                                                        'shareCampaign' =>
-                                                            $shareCampaign,
-
-                                                        'share' =>
-                                                            $share,
-                                                    ]
-                                                ) }}"
-                                                onsubmit="
-                                                    return confirm(
-                                                        'Reject this Facebook post?'
-                                                    );
-                                                "
-                                            >
-                                                @csrf
-                                                @method('PATCH')
-
-                                                <input
-                                                    type="hidden"
-                                                    name="rejection_reason"
-                                                    value="The post is not public or does not match the campaign."
-                                                >
-
-                                                <button
-                                                    class="
-                                                        button
-                                                        button-small
-                                                        button-danger
-                                                    "
-                                                    type="submit"
-                                                >
-                                                    Reject
-                                                </button>
-                                            </form>
+                                    <td>
+                                        <div class="table-cell-main">
+                                            {{
+                                                $share->ip_address
+                                                ?? 'N/A'
+                                            }}
                                         </div>
-                                    @elseif (
-                                        $share->status ===
-                                        \App\Models\CampaignShare
-                                            ::STATUS_VERIFIED
-                                    )
-                                        <button
-                                            class="
-                                                button
-                                                button-small
-                                                button-secondary
-                                            "
-                                            type="button"
-                                            disabled
-                                        >
-                                            Approved
-                                        </button>
-                                    @else
-                                        <button
-                                            class="
-                                                button
-                                                button-small
-                                                button-secondary
-                                            "
-                                            type="button"
-                                            disabled
-                                        >
-                                            Rejected
-                                        </button>
-                                    @endif
-                                </td>
-                            </tr>
+                                    </td>
+
+                                    <td>
+                                        @if (
+                                            $share->status ===
+                                            \App\Models\CampaignShare
+                                                ::STATUS_PENDING
+                                        )
+                                            <div class="review-actions">
+                                                <form
+                                                    method="POST"
+                                                    action="{{ route(
+                                                        'portal.share-campaigns.shares.approve',
+                                                        [
+                                                            'shareCampaign' =>
+                                                                $shareCampaign,
+
+                                                            'share' =>
+                                                                $share,
+                                                        ]
+                                                    ) }}"
+                                                    onsubmit="
+                                                        return confirm(
+                                                            'Approve this Facebook post?'
+                                                        );
+                                                    "
+                                                >
+                                                    @csrf
+                                                    @method('PATCH')
+
+                                                    <button
+                                                        class="
+                                                            button
+                                                            button-small
+                                                            button-success
+                                                        "
+                                                        type="submit"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                </form>
+
+                                                <form
+                                                    method="POST"
+                                                    action="{{ route(
+                                                        'portal.share-campaigns.shares.reject',
+                                                        [
+                                                            'shareCampaign' =>
+                                                                $shareCampaign,
+
+                                                            'share' =>
+                                                                $share,
+                                                        ]
+                                                    ) }}"
+                                                    onsubmit="
+                                                        return confirm(
+                                                            'Reject this Facebook post?'
+                                                        );
+                                                    "
+                                                >
+                                                    @csrf
+                                                    @method('PATCH')
+
+                                                    <input
+                                                        type="hidden"
+                                                        name="rejection_reason"
+                                                        value="The post is not public or does not match the campaign."
+                                                    >
+
+                                                    <button
+                                                        class="
+                                                            button
+                                                            button-small
+                                                            button-danger
+                                                        "
+                                                        type="submit"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        @elseif (
+                                            $share->status ===
+                                            \App\Models\CampaignShare
+                                                ::STATUS_VERIFIED
+                                        )
+                                            <button
+                                                class="
+                                                    button
+                                                    button-small
+                                                    button-secondary
+                                                "
+                                                type="button"
+                                                disabled
+                                            >
+                                                Approved
+                                            </button>
+                                        @else
+                                            <button
+                                                class="
+                                                    button
+                                                    button-small
+                                                    button-secondary
+                                                "
+                                                type="button"
+                                                disabled
+                                            >
+                                                Rejected
+                                            </button>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
                         @empty
                             <tr>
                                 <td

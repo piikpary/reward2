@@ -61,6 +61,9 @@ class CampaignController extends Controller
                             'rewardSpins' =>
                                 (int) $campaign
                                     ->reward_spins,
+                            'expiryDate' =>
+                                $campaign->expires_at
+                                    ?->toISOString(),
                         ];
                     })
                     ->values()
