@@ -832,6 +832,26 @@
                             </span>
                         </a>
                         <a
+                            href="{{ route(
+                                'portal.registration-reward.edit'
+                            ) }}"
+                            class="sidebar-link {{
+                                request()->routeIs(
+                                    'portal.registration-reward.*'
+                                )
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <span class="sidebar-icon">
+                                🎁
+                            </span>
+
+                            <span class="sidebar-text">
+                                Registration Reward
+                            </span>
+                        </a>
+                        <a
                             href="{{ route('portal.spin-results.index') }}"
                             class="sidebar-link {{
                                 request()->routeIs('portal.spin-results.*')

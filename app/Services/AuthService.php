@@ -12,13 +12,21 @@ class AuthService
 {
     protected OtpService $otpService;
 
-    public function __construct(OtpService $otpService)
-    {
+    protected RegistrationRewardService $registrationRewardService;
+
+    public function __construct(
+        OtpService $otpService,
+        RegistrationRewardService $registrationRewardService
+    ) {
         $this->otpService = $otpService;
+        $this->registrationRewardService = $registrationRewardService;
     }
 
-    public function handleOtpLoginOrRegister(array $data, UserType $registrationType, array $allowedLoginTypes): array
-    {
+    public function handleOtpLoginOrRegister(
+        array $data,
+        UserType $registrationType,
+        array $allowedLoginTypes
+    ): array {
         $phone = $this->otpService->normalizePhone($data['phone']);
         $otp = $data['otp'];
 
@@ -28,15 +36,25 @@ class AuthService
 
         if ($user) {
             if (!in_array($user->user_type, $allowedLoginTypes)) {
-                throw new Exception(__('messages.user_type_mismatch'), 409);
+                throw new Exception(
+                    __('messages.user_type_mismatch'),
+                    409
+                );
             }
 
             if ($user->status !== UserStatus::ACTIVE) {
-                throw new Exception(__('messages.user_inactive'), 403);
+                throw new Exception(
+                    __('messages.user_inactive'),
+                    403
+                );
             }
 
             if (($data['platform'] ?? 'mobile') !== 'web') {
-                $this->syncDeviceDetails($user, $data['device_uuid'], $data['fcm_token']);
+                $this->syncDeviceDetails(
+                    $user,
+                    $data['device_uuid'],
+                    $data['fcm_token']
+                );
             }
 
             return [
@@ -46,10 +64,20 @@ class AuthService
             ];
         }
 
-        $user = $this->registerNewUser($phone, $registrationType);
+        $user = $this->registerNewUser(
+            $phone,
+            $registrationType
+        );
 
         if (($data['platform'] ?? 'mobile') !== 'web') {
-            $this->syncDeviceDetails($user, $data['device_uuid'], $data['fcm_token']);
+            $this->syncDeviceDetails(
+                $user,
+                $data['device_uuid'],
+                $data['fcm_token']
+            );
+
+            $this->registrationRewardService
+                ->awardToNewUser($user);
         }
 
         return [
@@ -59,16 +87,27 @@ class AuthService
         ];
     }
 
-    public function syncDeviceDetails(User $user, string $newDeviceUuid, string $newFcmToken): void
-    {
-        DB::transaction(function () use ($user, $newDeviceUuid, $newFcmToken) {
+    public function syncDeviceDetails(
+        User $user,
+        string $newDeviceUuid,
+        string $newFcmToken
+    ): void {
+        DB::transaction(function () use (
+            $user,
+            $newDeviceUuid,
+            $newFcmToken
+        ) {
             User::where('device_uuid', $newDeviceUuid)
                 ->where('id', '!=', $user->id)
-                ->update(['device_uuid' => null]);
+                ->update([
+                    'device_uuid' => null,
+                ]);
 
             User::where('fcm_token', $newFcmToken)
                 ->where('id', '!=', $user->id)
-                ->update(['fcm_token' => null]);
+                ->update([
+                    'fcm_token' => null,
+                ]);
 
             $user->device_uuid = $newDeviceUuid;
             $user->fcm_token = $newFcmToken;
@@ -76,26 +115,38 @@ class AuthService
         });
     }
 
-    public function createAuthToken(User $user, string $tokenName): string
-    {
+    public function createAuthToken(
+        User $user,
+        string $tokenName
+    ): string {
         $user->tokens()->delete();
 
-        return $user->createToken($tokenName)->plainTextToken;
+        return $user
+            ->createToken($tokenName)
+            ->plainTextToken;
     }
 
-        private function registerNewUser(string $phone, UserType $userType): User
-    {
-        return DB::transaction(function () use ($phone, $userType) {
+    private function registerNewUser(
+        string $phone,
+        UserType $userType
+    ): User {
+        return DB::transaction(function () use (
+            $phone,
+            $userType
+        ) {
             $user = User::create([
                 'phone_number' => $phone,
                 'user_type' => $userType,
                 'status' => UserStatus::ACTIVE,
                 'name' => $phone,
-                'password' => bcrypt(str()->random(32)),
+                'password' => bcrypt(
+                    str()->random(32)
+                ),
                 'signature' => User::generateSignature(),
             ]);
 
-            app(\App\Services\WalletService::class)->ensureUserWallets($user);
+            app(\App\Services\WalletService::class)
+                ->ensureUserWallets($user);
 
             return $user;
         });

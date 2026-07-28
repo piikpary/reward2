@@ -16,6 +16,7 @@ use App\Http\Controllers\Portal\SpinResultController;
 use App\Http\Controllers\Portal\ShareCampaignController;
 use App\Http\Controllers\Web\ShareCampaignViewController;
 use App\Http\Controllers\Portal\ShareCampaignRewardController;
+use App\Http\Controllers\Portal\RegistrationRewardSettingController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -199,6 +200,22 @@ Route::middleware('auth')
                     [SpinSubCampaignController::class, 'destroy']
                 )->name('destroy');
             });
+
+            Route::get(
+                'registration-reward',
+                [
+                    RegistrationRewardSettingController::class,
+                    'edit',
+                ]
+            )->name('registration-reward.edit');
+
+            Route::put(
+                'registration-reward',
+                [
+                    RegistrationRewardSettingController::class,
+                    'update',
+                ]
+            )->name('registration-reward.update');
 
         /*
         |--------------------------------------------------------------------------
