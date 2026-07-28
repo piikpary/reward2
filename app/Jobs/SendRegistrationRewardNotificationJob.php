@@ -58,15 +58,46 @@ class SendRegistrationRewardNotificationJob
             return;
         }
 
-        $language =
-            $user->language ?? 'en';
+        /*
+         * Normalize language values such as:
+         * km, kh, khmer, km-KH, kh-KH, km_KH.
+         */
+        $language = strtolower(
+            trim(
+                (string) (
+                    $user->language
+                    ?? 'en'
+                )
+            )
+        );
+
+        $language = str_replace(
+            '_',
+            '-',
+            $language
+        );
+
+        $isKhmer = in_array(
+            $language,
+            [
+                'km',
+                'kh',
+                'khmer',
+                'km-kh',
+                'kh-kh',
+            ],
+            true
+        );
 
         $displayAmount =
             $this->formatAmount(
                 $this->amount
             );
 
-        if ($this->walletType === 'discount') {
+        if (
+            $this->walletType
+            === 'discount'
+        ) {
             $englishBody =
                 "Your registration was successful! "
                 . "Enjoy {$displayAmount} bonus Discounts "
@@ -74,8 +105,9 @@ class SendRegistrationRewardNotificationJob
 
             $khmerBody =
                 "ការចុះឈ្មោះរបស់អ្នកបានជោគជ័យ! "
-                . "សូមរីករាយជាមួយការបញ្ចុះតម្លៃ "
-                . "{$displayAmount} ជាកាដូស្វាគមន៍។";
+                . "សូមរីករាយជាមួយការបញ្ចុះតម្លៃបន្ថែម "
+                . "{$displayAmount}% "
+                . "ជាកាដូស្វាគមន៍ពីយើង។";
         } else {
             $englishBody =
                 "Your registration was successful! "
@@ -84,15 +116,16 @@ class SendRegistrationRewardNotificationJob
 
             $khmerBody =
                 "ការចុះឈ្មោះរបស់អ្នកបានជោគជ័យ! "
-                . "សូមរីករាយជាមួយ {$displayAmount} Spin "
-                . "ជាកាដូស្វាគមន៍។";
+                . "សូមរីករាយជាមួយ Spin បន្ថែមចំនួន "
+                . "{$displayAmount} "
+                . "ជាកាដូស្វាគមន៍ពីយើង។";
         }
 
-        $title = $language === 'km'
+        $title = $isKhmer
             ? 'កាដូស្វាគមន៍'
             : 'Welcome Gift';
 
-        $body = $language === 'km'
+        $body = $isKhmer
             ? $khmerBody
             : $englishBody;
 
@@ -126,7 +159,9 @@ class SendRegistrationRewardNotificationJob
                         (string) $user->id,
 
                     'language' =>
-                        (string) $language,
+                        $isKhmer
+                            ? 'km'
+                            : 'en',
 
                     'badge' =>
                         (string) $badgeCount,
@@ -143,6 +178,10 @@ class SendRegistrationRewardNotificationJob
                         $this->amount,
                     'transaction_id' =>
                         $this->transactionId,
+                    'language' =>
+                        $isKhmer
+                            ? 'km'
+                            : 'en',
                 ]
             );
         } catch (\Throwable $exception) {
