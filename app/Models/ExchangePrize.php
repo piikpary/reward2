@@ -13,6 +13,7 @@ class ExchangePrize extends Model
         'title',
         'image_path',
         'exchange_discount_amount',
+        'unit',
     ];
 
     protected function casts(): array

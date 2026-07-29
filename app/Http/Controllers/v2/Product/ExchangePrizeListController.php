@@ -8,18 +8,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
-class ExchangePrizeListController
-    extends Controller
+class ExchangePrizeListController extends Controller
 {
     public function index(
         Request $request
     ): JsonResponse {
         $page = max(
             1,
-            (int) $request->input(
-                'page',
-                1
-            )
+            (int) $request->input('page', 1)
         );
 
         $perPage = min(
@@ -33,33 +29,26 @@ class ExchangePrizeListController
             )
         );
 
-        $categoryId =
-            $this->parseCategoryId(
-                $request->input(
-                    'category_id'
-                )
-            );
+        $categoryId = $this->parseCategoryId(
+            $request->input('category_id')
+        );
 
         $version = (int) Cache::get(
             'reward2:exchange-prizes:version',
             1
         );
 
-        $cacheKey = implode(
-            ':',
-            [
-                'reward2',
-                'api',
-                'exchange-prize-list',
-                "v{$version}",
-                "page-{$page}",
-                "per-page-{$perPage}",
-                'category-' .
-                    ($categoryId ?? 'all'),
-            ]
-        );
+        $cacheKey = implode(':', [
+            'reward2',
+            'api',
+            'exchange-prize-list',
+            "v{$version}",
+            "page-{$page}",
+            "per-page-{$perPage}",
+            'category-' . ($categoryId ?? 'all'),
+        ]);
 
-        $response = Cache::remember(
+        $result = Cache::remember(
             $cacheKey,
             now()->addSeconds(60),
             function () use (
@@ -74,6 +63,7 @@ class ExchangePrizeListController
                         'image_path',
                         'title',
                         'exchange_discount_amount',
+                        'unit',
                         'created_at',
                     ])
                     ->with([
@@ -89,8 +79,10 @@ class ExchangePrizeListController
                     )
                     ->latest('id')
                     ->paginate(
-                        perPage: $perPage,
-                        page: $page
+                        $perPage,
+                        ['*'],
+                        'page',
+                        $page
                     );
 
                 $items = collect(
@@ -120,6 +112,9 @@ class ExchangePrizeListController
                                     ->category
                                     ?->name
                                 ?? 'Uncategorized',
+
+                            'unit' =>
+                                $product->unit,
                         ]
                     )
                     ->values()
@@ -130,20 +125,16 @@ class ExchangePrizeListController
 
                     'pagination' => [
                         'currentPage' =>
-                            $products
-                                ->currentPage(),
+                            $products->currentPage(),
 
                         'totalPages' =>
-                            $products
-                                ->lastPage(),
+                            $products->lastPage(),
 
                         'totalItems' =>
-                            $products
-                                ->total(),
+                            $products->total(),
 
                         'itemsPerPage' =>
-                            $products
-                                ->perPage(),
+                            $products->perPage(),
                     ],
                 ];
             }
@@ -156,10 +147,10 @@ class ExchangePrizeListController
                 'Products retrieved successfully',
 
             'data' =>
-                $response['data'],
+                $result['data'],
 
             'pagination' =>
-                $response['pagination'],
+                $result['pagination'],
         ]);
     }
 
@@ -180,10 +171,7 @@ class ExchangePrizeListController
                 'cat_'
             )
         ) {
-            $value = substr(
-                $value,
-                4
-            );
+            $value = substr($value, 4);
         }
 
         $categoryId = (int) $value;

@@ -524,6 +524,7 @@
                             <th>Product</th>
                             <th>Category</th>
                             <th>Exchange Discount</th>
+                            <th>Unit</th>
                             <th>Created At</th>
                             <th>Action</th>
                         </tr>
@@ -639,6 +640,11 @@
                                         }}
                                     </span>
                                 </td>
+                                <td>
+                                    <span class="ep-category-badge">
+                                        {{ $exchangePrize->unit ?: '-' }}
+                                    </span>
+                                </td>
 
                                 <td>
                                     <div class="ep-date-main">
@@ -707,7 +713,7 @@
                         @empty
                             <tr>
                                 <td
-                                    colspan="6"
+                                    colspan="7"
                                     class="ep-empty"
                                 >
                                     <div class="ep-empty-icon">

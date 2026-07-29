@@ -81,6 +81,11 @@ class ExchangePrizeController extends Controller
                 'mimes:jpg,jpeg,png,webp',
                 'max:5120',
             ],
+            'unit' => [
+                'required',
+                'string',
+                'max:100',
+            ],
         ]);
 
         $imagePath = $request
@@ -99,6 +104,9 @@ class ExchangePrizeController extends Controller
 
             'exchange_discount_amount' =>
                 $validated['exchange_discount_amount'],
+
+            'unit' =>
+                trim($validated['unit']),
 
             'image_path' =>
                 $imagePath,
@@ -164,6 +172,11 @@ class ExchangePrizeController extends Controller
                 'min:0',
                 'max:999999999.99',
             ],
+            'unit' => [
+                'required',
+                'string',
+                'max:100',
+            ],
 
             'image' => [
                 'nullable',
@@ -182,6 +195,9 @@ class ExchangePrizeController extends Controller
 
             'exchange_discount_amount' =>
                 $validated['exchange_discount_amount'],
+
+            'unit' =>
+                trim($validated['unit']),
         ];
 
         if ($request->hasFile('image')) {

@@ -411,42 +411,74 @@
             </div>
 
             <div class="ep-field">
-                <label
-                    for="exchange_discount_amount"
-                    class="ep-label"
-                >
-                    Exchange Discount Amount
-                    <span class="ep-required">*</span>
-                </label>
+                    <label
+                        for="exchange_discount_amount"
+                        class="ep-label"
+                    >
+                        Exchange Discount Amount
+                        <span class="ep-required">*</span>
+                    </label>
 
-                <input
-                    id="exchange_discount_amount"
-                    name="exchange_discount_amount"
-                    type="number"
-                    class="ep-input"
-                    min="0"
-                    step="0.01"
-                    value="{{ old(
-                        'exchange_discount_amount',
-                        $exchangePrize
-                            ->exchange_discount_amount
-                        ?? ''
-                    ) }}"
-                    placeholder="Example: 25"
-                    required
-                >
+                    <input
+                        id="exchange_discount_amount"
+                        name="exchange_discount_amount"
+                        type="number"
+                        class="ep-input"
+                        min="0"
+                        step="0.01"
+                        value="{{ old(
+                            'exchange_discount_amount',
+                            $exchangePrize->exchange_discount_amount ?? ''
+                        ) }}"
+                        placeholder="Example: 25"
+                        required
+                    >
 
-                <div class="ep-field-help">
-                    Amount of Discount balance required
-                    to exchange this product.
+                    <div class="ep-field-help">
+                        Amount of Discount balance required
+                        to exchange this product.
+                    </div>
+
+                    @error('exchange_discount_amount')
+                        <div class="ep-field-error">
+                            {{ $message }}
+                        </div>
+                    @enderror
                 </div>
 
-                @error('exchange_discount_amount')
-                    <div class="ep-field-error">
-                        {{ $message }}
+                <div class="ep-field">
+                    <label
+                        for="unit"
+                        class="ep-label"
+                    >
+                        Unit
+                        <span class="ep-required">*</span>
+                    </label>
+
+                    <input
+                        id="unit"
+                        name="unit"
+                        type="text"
+                        class="ep-input"
+                        maxlength="100"
+                        value="{{ old(
+                            'unit',
+                            $exchangePrize->unit ?? ''
+                        ) }}"
+                        placeholder="Example: កំប៉ុង, ដប, ប្រអប់"
+                        required
+                    >
+
+                    <div class="ep-field-help">
+                        Example: កំប៉ុង, ដប, ប្រអប់.
                     </div>
-                @enderror
-            </div>
+
+                    @error('unit')
+                        <div class="ep-field-error">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                </div>
 
             <div class="ep-field ep-field-full">
                 <label
