@@ -711,6 +711,237 @@
 .sidebar-text {
     flex: 1;
 }
+
+        /* =========================================================
+           Clean grouped portal sidebar
+           ========================================================= */
+
+        .sidebar {
+            position: sticky;
+            top: 68px;
+            height: calc(100vh - 68px);
+            min-height: 0;
+            padding: 22px 14px 28px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--sidebar);
+            color: var(--white);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .portal-navigation {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .portal-nav-section {
+            margin: 17px 13px 7px;
+            color: rgba(255, 255, 255, 0.38);
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .portal-nav-section:first-child {
+            margin-top: 0;
+        }
+
+        .portal-nav-link,
+        .portal-nav-summary {
+            width: 100%;
+            min-height: 48px;
+            padding: 0 15px;
+            border: 1px solid transparent;
+            border-radius: 13px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.86);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.3;
+            cursor: pointer;
+            user-select: none;
+            transition:
+                background 0.18s ease,
+                color 0.18s ease,
+                border-color 0.18s ease,
+                transform 0.18s ease;
+        }
+
+        .portal-nav-link:hover,
+        .portal-nav-summary:hover {
+            border-color: rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.07);
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .portal-nav-link.active {
+            border-color: #ffffff;
+            background: #ffffff;
+            color: #0d1b2a;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.17);
+        }
+
+        .portal-nav-icon {
+            width: 22px;
+            height: 22px;
+            flex: 0 0 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+        }
+
+        .portal-nav-label {
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .portal-nav-group {
+            width: 100%;
+        }
+
+        .portal-nav-summary {
+            list-style: none;
+        }
+
+        .portal-nav-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .portal-nav-summary::marker {
+            display: none;
+            content: "";
+        }
+
+        .portal-nav-group.group-active .portal-nav-summary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+        }
+
+        .portal-nav-arrow {
+            margin-left: auto;
+            opacity: 0.55;
+            font-size: 18px;
+            line-height: 1;
+            transition: transform 0.2s ease;
+        }
+
+        .portal-nav-group[open] .portal-nav-arrow {
+            transform: rotate(90deg);
+        }
+
+        .portal-nav-submenu {
+            position: relative;
+            margin: 5px 0 6px 23px;
+            padding: 2px 0 2px 17px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .portal-nav-submenu::before {
+            content: "";
+            position: absolute;
+            top: 3px;
+            bottom: 3px;
+            left: 0;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .portal-nav-sub-link {
+            min-height: 40px;
+            padding: 0 12px;
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.62);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 700;
+            transition:
+                background 0.18s ease,
+                color 0.18s ease;
+        }
+
+        .portal-nav-sub-link::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            flex: 0 0 6px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.26);
+        }
+
+        .portal-nav-sub-link:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #ffffff;
+            text-decoration: none;
+        }
+
+        .portal-nav-sub-link.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+        }
+
+        .portal-nav-sub-link.active::before {
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-width: 992px) {
+            .sidebar {
+                position: static;
+                width: 100%;
+                height: auto;
+                padding: 14px;
+                overflow: visible;
+            }
+
+            .portal-navigation {
+                min-width: 760px;
+                flex-direction: row;
+                align-items: flex-start;
+                overflow-x: auto;
+                padding-bottom: 5px;
+            }
+
+            .portal-nav-section {
+                display: none;
+            }
+
+            .portal-nav-link,
+            .portal-nav-group {
+                min-width: 180px;
+                flex: 0 0 auto;
+            }
+
+            .portal-nav-submenu {
+                margin-left: 12px;
+            }
+        }
+
     </style>
 
     @stack('styles')
@@ -750,92 +981,259 @@
 <div class="layout">
     @auth
         <aside class="sidebar">
-            <nav class="nav">
+            <nav class="portal-navigation">
+                @php
+                    $masterDataActive =
+                        request()->routeIs(
+                            'portal.product-categories.*'
+                        )
+                        || request()->routeIs(
+                            'portal.exchange-prizes.*'
+                        );
+
+                    $rewardManagementActive =
+                        request()->routeIs(
+                            'portal.special-spin-rewards.*'
+                        )
+                        || request()->routeIs(
+                            'portal.registration-reward.*'
+                        )
+                        || request()->routeIs(
+                            'portal.spin-results.*'
+                        );
+
+                    $spinCampaignActive =
+                        request()->routeIs(
+                            'portal.spin-campaigns*'
+                        );
+                @endphp
+
+                <div class="portal-nav-section">
+                    Main
+                </div>
+
                 <a
                     href="{{ route('portal.dashboard') }}"
-                    class="nav-link {{ request()->routeIs('portal.dashboard') ? 'active' : '' }}"
+                    class="portal-nav-link {{
+                        request()->routeIs('portal.dashboard')
+                            ? 'active'
+                            : ''
+                    }}"
                 >
-                    <span class="nav-icon">▦</span>
-                    <span>Dashboard</span>
+                    <span class="portal-nav-icon">▦</span>
+                    <span class="portal-nav-label">
+                        Dashboard
+                    </span>
                 </a>
 
                 <a
                     href="{{ route('portal.profile.edit') }}"
-                    class="nav-link {{ request()->routeIs('portal.profile.*') ? 'active' : '' }}"
+                    class="portal-nav-link {{
+                        request()->routeIs('portal.profile.*')
+                            ? 'active'
+                            : ''
+                    }}"
                 >
-                    <span class="nav-icon">♙</span>
-                    <span>Profile</span>
+                    <span class="portal-nav-icon">♙</span>
+                    <span class="portal-nav-label">
+                        Profile
+                    </span>
                 </a>
 
                 <a
                     href="{{ route('portal.sliders.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.sliders.*') ? 'active' : '' }}"
+                    class="portal-nav-link {{
+                        request()->routeIs('portal.sliders.*')
+                            ? 'active'
+                            : ''
+                    }}"
                 >
-                    <span class="nav-icon">▣</span>
-                    <span>Sliders</span>
+                    <span class="portal-nav-icon">▣</span>
+                    <span class="portal-nav-label">
+                        Sliders
+                    </span>
                 </a>
 
                 <a
                     href="{{ route('portal.customers.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.customers.*') ? 'active' : '' }}"
+                    class="portal-nav-link {{
+                        request()->routeIs('portal.customers.*')
+                            ? 'active'
+                            : ''
+                    }}"
                 >
-                    <span class="nav-icon">👥</span>
-                    <span>Customers</span>
+                    <span class="portal-nav-icon">👥</span>
+                    <span class="portal-nav-label">
+                        Customers
+                    </span>
                 </a>
+
+                <div class="portal-nav-section">
+                    Content & Engagement
+                </div>
 
                 <a
                     href="{{ route('portal.discounts.index') }}"
-                    class="nav-link {{ request()->routeIs('portal.discounts.*') ? 'active' : '' }}"
-                >
-                    <span class="nav-icon">%</span>
-                    <span>Discount List</span>
-                </a>
-                <a
-                    href="{{ route('portal.announcements.index') }}"
-                    class="sidebar-link {{
-                        request()->routeIs('portal.announcements.*')
+                    class="portal-nav-link {{
+                        request()->routeIs('portal.discounts.*')
                             ? 'active'
                             : ''
                     }}"
                 >
-                    <span class="sidebar-icon">📢</span>
-                    <span class="sidebar-text">Announcements</span>
+                    <span class="portal-nav-icon">%</span>
+                    <span class="portal-nav-label">
+                        Discount List
+                    </span>
                 </a>
-                <a
-                    href="{{ route('portal.share-campaigns.index') }}"
-                    class="sidebar-link {{
-                        request()->routeIs('portal.share-campaigns.*')
-                            ? 'active'
-                            : ''
-                    }}"
-                >
-                    <span class="sidebar-icon">📣</span>
 
-                    <span class="sidebar-text">
+                <a
+                    href="{{ route(
+                        'portal.announcements.index'
+                    ) }}"
+                    class="portal-nav-link {{
+                        request()->routeIs(
+                            'portal.announcements.*'
+                        )
+                            ? 'active'
+                            : ''
+                    }}"
+                >
+                    <span class="portal-nav-icon">📢</span>
+                    <span class="portal-nav-label">
+                        Announcements
+                    </span>
+                </a>
+
+                <a
+                    href="{{ route(
+                        'portal.share-campaigns.index'
+                    ) }}"
+                    class="portal-nav-link {{
+                        request()->routeIs(
+                            'portal.share-campaigns.*'
+                        )
+                            ? 'active'
+                            : ''
+                    }}"
+                >
+                    <span class="portal-nav-icon">📣</span>
+                    <span class="portal-nav-label">
                         Share Campaigns
                     </span>
                 </a>
-                
-                <li class="sidebar-item">
+
+                <div class="portal-nav-section">
+                    Management
+                </div>
+
+                <details
+                    class="portal-nav-group {{
+                        $masterDataActive
+                            ? 'group-active'
+                            : ''
+                    }}"
+                    @if ($masterDataActive)
+                        open
+                    @endif
+                >
+                    <summary class="portal-nav-summary">
+                        <span class="portal-nav-icon">
+                            🗂️
+                        </span>
+
+                        <span class="portal-nav-label">
+                            Master Data
+                        </span>
+
+                        <span class="portal-nav-arrow">
+                            ›
+                        </span>
+                    </summary>
+
+                    <div class="portal-nav-submenu">
                         <a
-                            href="{{ route('portal.special-spin-rewards.index') }}"
-                            class="sidebar-link {{
-                                request()->routeIs('portal.special-spin-rewards.*')
+                            href="{{ route(
+                                'portal.product-categories.index'
+                            ) }}"
+                            class="portal-nav-sub-link {{
+                                request()->routeIs(
+                                    'portal.product-categories.*'
+                                )
                                     ? 'active'
                                     : ''
                             }}"
                         >
-                            <span class="sidebar-icon">🎁</span>
+                            <span>
+                                Product Categories
+                            </span>
+                        </a>
 
-                            <span class="sidebar-text">
+                        <a
+                            href="{{ route(
+                                'portal.exchange-prizes.index'
+                            ) }}"
+                            class="portal-nav-sub-link {{
+                                request()->routeIs(
+                                    'portal.exchange-prizes.*'
+                                )
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <span>
+                                Exchange Products
+                            </span>
+                        </a>
+                    </div>
+                </details>
+
+                <details
+                    class="portal-nav-group {{
+                        $rewardManagementActive
+                            ? 'group-active'
+                            : ''
+                    }}"
+                    @if ($rewardManagementActive)
+                        open
+                    @endif
+                >
+                    <summary class="portal-nav-summary">
+                        <span class="portal-nav-icon">
+                            🎁
+                        </span>
+
+                        <span class="portal-nav-label">
+                            Reward Management
+                        </span>
+
+                        <span class="portal-nav-arrow">
+                            ›
+                        </span>
+                    </summary>
+
+                    <div class="portal-nav-submenu">
+                        <a
+                            href="{{ route(
+                                'portal.special-spin-rewards.index'
+                            ) }}"
+                            class="portal-nav-sub-link {{
+                                request()->routeIs(
+                                    'portal.special-spin-rewards.*'
+                                )
+                                    ? 'active'
+                                    : ''
+                            }}"
+                        >
+                            <span>
                                 Special Spin Rewards
                             </span>
                         </a>
+
                         <a
                             href="{{ route(
                                 'portal.registration-reward.edit'
                             ) }}"
-                            class="sidebar-link {{
+                            class="portal-nav-sub-link {{
                                 request()->routeIs(
                                     'portal.registration-reward.*'
                                 )
@@ -843,61 +1241,75 @@
                                     : ''
                             }}"
                         >
-                            <span class="sidebar-icon">
-                                🎁
-                            </span>
-
-                            <span class="sidebar-text">
+                            <span>
                                 Registration Reward
                             </span>
                         </a>
+
                         <a
-                            href="{{ route('portal.spin-results.index') }}"
-                            class="sidebar-link {{
-                                request()->routeIs('portal.spin-results.*')
+                            href="{{ route(
+                                'portal.spin-results.index'
+                            ) }}"
+                            class="portal-nav-sub-link {{
+                                request()->routeIs(
+                                    'portal.spin-results.*'
+                                )
                                     ? 'active'
                                     : ''
                             }}"
                         >
-                            <span class="sidebar-icon">🎯</span>
-
-                            <span class="sidebar-text">
+                            <span>
                                 Spin Results
                             </span>
                         </a>
-                    </li>
+                    </div>
+                </details>
 
-                <div class="nav-group">
+                <div class="portal-nav-section">
+                    Campaign Setup
+                </div>
+
+                <div class="portal-nav-group">
                     <a
-                        href="{{ route('portal.spin-campaigns.index') }}"
-                        class="nav-link {{ request()->routeIs('portal.spin-campaigns*') ? 'active' : '' }}"
+                        href="{{ route(
+                            'portal.spin-campaigns.index'
+                        ) }}"
+                        class="portal-nav-link {{
+                            $spinCampaignActive
+                                ? 'active'
+                                : ''
+                        }}"
                     >
-                        <span class="nav-icon">🎯</span>
+                        <span class="portal-nav-icon">
+                            🎯
+                        </span>
 
-                        <span class="nav-label">
+                        <span class="portal-nav-label">
                             Spin Campaigns
                         </span>
 
-                        <span class="nav-arrow">
-                            {{ request()->routeIs('portal.spin-campaigns*') ? '⌄' : '›' }}
+                        <span class="portal-nav-arrow">
+                            ›
                         </span>
                     </a>
 
-                    @if(
+                    @if (
                         isset($campaign)
                         && request()->routeIs(
                             'portal.spin-campaigns.sub-campaigns.*'
                         )
                     )
-                        <div class="nav-submenu">
+                        <div class="portal-nav-submenu">
                             <a
                                 href="{{ route(
                                     'portal.spin-campaigns.sub-campaigns.index',
                                     $campaign
                                 ) }}"
-                                class="nav-sub-link active"
+                                class="portal-nav-sub-link active"
                             >
-                                <span>Subcampaigns</span>
+                                <span>
+                                    Subcampaigns
+                                </span>
                             </a>
                         </div>
                     @endif

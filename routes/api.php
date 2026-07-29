@@ -12,6 +12,8 @@ use App\Http\Controllers\v2\Announcement\AnnouncementController;
 use App\Http\Controllers\v2\User\LanguageController;
 use App\Http\Controllers\v2\User\NotificationController;
 use App\Http\Controllers\v2\Campaign\CampaignController;
+use App\Http\Controllers\v2\Product\ExchangePrizeListController;
+use App\Http\Controllers\v2\Product\ProductCategoryController as ApiProductCategoryController;
 
 Route::prefix('auth')->group(function () {
     Route::post('request-otp', [AuthController::class, 'requestOtp'])
@@ -27,6 +29,22 @@ Route::prefix('auth')->group(function () {
 | Public campaign API
 |--------------------------------------------------------------------------
 */
+
+Route::get(
+    '/productcategories',
+    [
+        ApiProductCategoryController::class,
+        'index',
+    ]
+);
+
+Route::get(
+    '/exchangeprizelist',
+    [
+        ExchangePrizeListController::class,
+        'index',
+    ]
+);
 
 Route::get(
     'campaign-list',

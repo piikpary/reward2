@@ -17,6 +17,8 @@ use App\Http\Controllers\Portal\ShareCampaignController;
 use App\Http\Controllers\Web\ShareCampaignViewController;
 use App\Http\Controllers\Portal\ShareCampaignRewardController;
 use App\Http\Controllers\Portal\RegistrationRewardSettingController;
+use App\Http\Controllers\Portal\ProductCategoryController;
+use App\Http\Controllers\Portal\ExchangePrizeController;
 
 Route::get('/', function () {
     return redirect()->route('portal.login');
@@ -158,6 +160,22 @@ Route::middleware('auth')
             SpinCampaignController::class
         )->parameters([
             'spin-campaigns' => 'spinCampaign',
+        ]);
+
+        Route::resource(
+                'product-categories',
+                ProductCategoryController::class
+            )->except([
+                'show',
+            ]);
+
+        Route::resource(
+            'exchange-prizes',
+            ExchangePrizeController::class
+        )->parameters([
+            'exchange-prizes' => 'exchangePrize',
+        ])->except([
+            'show',
         ]);
 
         /*
