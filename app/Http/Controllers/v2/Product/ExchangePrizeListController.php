@@ -98,7 +98,7 @@ class ExchangePrizeListController extends Controller
                                 ),
 
                             'productItemImage' =>
-                                $product->imageUrl(),
+                                $product->thumbnailUrl(),
 
                             'productItemTitle' =>
                                 $product->title,

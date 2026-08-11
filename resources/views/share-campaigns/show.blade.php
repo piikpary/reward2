@@ -10,35 +10,70 @@
 
     <title>{{ $title }}</title>
 
-    <meta property="og:title" content="{{ $title }}">
+    <!-- Open Graph Meta Tags -->
+    <meta
+        property="og:url"
+        content="{{ $pageUrl }}"
+    >
+
+    <meta
+        property="og:type"
+        content="website"
+    >
+
+    <meta
+        property="og:title"
+        content="{{ $title }}"
+    >
+
     <meta
         property="og:description"
         content="{{ $description }}"
     >
 
     @if ($imageUrl)
-        <meta property="og:image" content="{{ $imageUrl }}">
+        <meta
+            property="og:image"
+            content="{{ $imageUrl }}"
+        >
+
         <meta
             property="og:image:secure_url"
             content="{{ $imageUrl }}"
         >
+
+        <meta
+            property="og:image:alt"
+            content="{{ $title }}"
+        >
     @endif
 
-    <meta property="og:url" content="{{ $pageUrl }}">
-    <meta property="og:type" content="website">
+    <meta
+        property="fb:app_id"
+        content="{{ config('services.facebook.app_id') }}"
+    >
 
+    <!-- Twitter Card Meta Tags -->
     <meta
         name="twitter:card"
         content="summary_large_image"
     >
-    <meta name="twitter:title" content="{{ $title }}">
+
+    <meta
+        name="twitter:title"
+        content="{{ $title }}"
+    >
+
     <meta
         name="twitter:description"
         content="{{ $description }}"
     >
 
     @if ($imageUrl)
-        <meta name="twitter:image" content="{{ $imageUrl }}">
+        <meta
+            name="twitter:image"
+            content="{{ $imageUrl }}"
+        >
     @endif
 
     <style>

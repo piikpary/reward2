@@ -43,5 +43,49 @@ return [
             'SCANPRIZE_APP_DEEP_LINK'
         ),
     ],
+    'facebook' => [
+        'app_id' => env(
+            'FACEBOOK_APP_ID'
+        ),
+    ],
+    'mekong_sms' => [
+    'enabled' => env(
+        'MEKONGSMS_ENABLED',
+        false
+    ),
+
+    'base_url' => env(
+        'MEKONGSMS_BASE_URL',
+        'https://sandbox.mekongsms.com/api'
+    ),
+
+    'username' => env(
+        'MEKONGSMS_USERNAME'
+    ),
+
+    'password_md5' => env(
+        'MEKONGSMS_PASSWORD_MD5'
+    ),
+
+    'sender' => env(
+        'MEKONGSMS_SENDER',
+        'Reward2'
+    ),
+
+    'international' => (int) env(
+        'MEKONGSMS_INTERNATIONAL',
+        0
+    ),
+
+    'timeout' => (int) env(
+        'MEKONGSMS_TIMEOUT',
+        10
+    ),
+
+    'connect_timeout' => (int) env(
+        'MEKONGSMS_CONNECT_TIMEOUT',
+        5
+    ),
+],
 
 ];

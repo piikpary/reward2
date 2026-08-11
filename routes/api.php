@@ -15,15 +15,36 @@ use App\Http\Controllers\v2\Campaign\CampaignController;
 use App\Http\Controllers\v2\Product\ExchangePrizeListController;
 use App\Http\Controllers\v2\Product\ProductCategoryController as ApiProductCategoryController;
 
-Route::prefix('auth')->group(function () {
-    Route::post('request-otp', [AuthController::class, 'requestOtp'])
-        ->middleware('throttle:100,1')
-        ->name('customer.auth.request-otp');
+Route::prefix('auth')
+    ->group(function () {
+        Route::post(
+            'request-otp',
+            [
+                AuthController::class,
+                'requestOtp',
+            ]
+        )
+            ->middleware(
+                'throttle:5,1'
+            )
+            ->name(
+                'customer.auth.request-otp'
+            );
 
-    Route::post('verify-otp', [AuthController::class, 'verifyOtp'])
-        ->middleware('throttle:100,1')
-        ->name('customer.auth.verify-otp');
-});
+        Route::post(
+            'verify-otp',
+            [
+                AuthController::class,
+                'verifyOtp',
+            ]
+        )
+            ->middleware(
+                'throttle:10,1'
+            )
+            ->name(
+                'customer.auth.verify-otp'
+            );
+    });
 /*
 |--------------------------------------------------------------------------
 | Public campaign API

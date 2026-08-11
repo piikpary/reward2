@@ -11,6 +11,7 @@ services:
       - reward2_vendor:/var/www/vendor
     depends_on:
       - mysql
+      - redis
     networks:
       - reward2
 
@@ -60,6 +61,35 @@ services:
     depends_on:
       - app
       - mysql
+      - redis
+    networks:
+      - reward2
+
+  otp-queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reward2-otp-queue
+    restart: unless-stopped
+    working_dir: /var/www
+
+    command: >
+      php artisan queue:work redis
+      --queue=otp
+      --sleep=1
+      --tries=1
+      --timeout=40
+      --max-time=3600
+
+    volumes:
+      - ./:/var/www
+      - reward2_vendor:/var/www/vendor
+
+    depends_on:
+      - app
+      - mysql
+      - redis
+
     networks:
       - reward2
 
@@ -72,11 +102,13 @@ services:
       - --save
       - ""
       - --appendonly
-      - "no"
+      - "yes"
       - --maxmemory
-      - 128mb
+      - 256mb
       - --maxmemory-policy
-      - allkeys-lru
+      - noeviction
+    volumes:
+      - reward2_redis:/data
     healthcheck:
       test:
         - CMD
@@ -96,3 +128,4 @@ networks:
 volumes:
   reward2_mysql:
   reward2_vendor:
+  reward2_redis:
