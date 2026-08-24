@@ -34,11 +34,7 @@ class MekongSmsService
         string $otp,
         int $expiresInMinutes = 5
     ): string {
-        $message = sprintf(
-            'Your Reward2 OTP is %s. It expires in %d minutes.',
-            $otp,
-            $expiresInMinutes
-        );
+        $message = $otp;
 
         return $this->send(
             phone: $phone,
@@ -78,27 +74,25 @@ class MekongSmsService
             );
         }
 
-        
-
-       $sender = trim(
-    (string) config(
-            'services.mekong_sms.sender'
-        )
-    );
-
-    if (
-        mb_strlen($sender) > 11
-        || !preg_match(
-            '/^[A-Za-z0-9 ]+$/',
-            $sender
-        )
-    ) {
-        throw new RuntimeException(
-            'MekongSMS sender may contain letters, '
-            . 'numbers, and spaces, with a maximum '
-            . 'length of 11 characters.'
+        $sender = trim(
+            (string) config(
+                'services.mekong_sms.sender'
+            )
         );
-    }
+
+        if (
+            mb_strlen($sender) > 11
+            || !preg_match(
+                '/^[A-Za-z0-9 ]+$/',
+                $sender
+            )
+        ) {
+            throw new RuntimeException(
+                'MekongSMS sender may contain letters, '
+                . 'numbers, and spaces, with a maximum '
+                . 'length of 11 characters.'
+            );
+        }
 
         $url = rtrim(
             (string) config(
